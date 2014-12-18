@@ -49,3 +49,24 @@ def hamiltonian_path(graph, require_cycle=False):
 def hamiltonian_cycle(graph):
 	return hamiltonian_path(graph, require_cycle=True)
 
+# http://en.wikipedia.org/wiki/Knuth%27s_Algorithm_X
+def exact_cover(subsets):
+	def algox(subsets, nodes):
+		if not nodes:
+			return []
+		selected_node = min(nodes, key = lambda node: sum(node in subset for subset in subsets))
+		subset_choices = [subset for subset in subsets if selected_node in subset]
+		if not subset_choices:
+			return None
+		random.shuffle(subset_choices)
+		for selected_subset in subset_choices:
+			new_nodes = [node for node in nodes if node not in selected_subset]
+			isvalid = set(selected_subset).isdisjoint
+			new_subsets = [subset for subset in subsets if isvalid(set(subset))]
+			subcover = algox(new_subsets, new_nodes)
+			if subcover is not None:
+				return subcover + [selected_subset]
+		return None
+	subsets = list(subsets)
+	return algox(subsets, set().union(*subsets))
+

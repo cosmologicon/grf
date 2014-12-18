@@ -28,6 +28,18 @@ class GrfTest(unittest.TestCase):
 		self.assertFalse(grf.hamiltonian_path("AB CD".split()))
 		self.assertFalse(grf.hamiltonian_path("AB AC AD".split()))
 
+	def testExactCover(self):
+		def checkExactCover(pieces):
+			cover = grf.exact_cover(pieces)
+			self.assertTrue(all(piece in pieces for piece in cover))
+			nodes = [node for piece in cover for node in piece]
+			all_nodes = set(node for piece in pieces for node in piece)
+			self.assertEqual(sorted(nodes), sorted(all_nodes))
+		checkExactCover("AB CD".split())
+		checkExactCover("AB BC CD".split())
+		checkExactCover([(1, 4, 7), (1, 4), (4, 5, 7), (3, 5, 6), (2, 3, 6, 7), (2, 7)])
+		self.assertFalse(grf.exact_cover("AB BC".split()))
+
 if __name__ == '__main__':
 	unittest.main()
 

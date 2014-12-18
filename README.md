@@ -4,6 +4,7 @@ grf
 Simple tools for solving graph problems in python. Currently implemented:
 
   * Hamiltonian path and cycle
+  * Exact cover
 
 To install
 ----------
@@ -20,3 +21,7 @@ Data in grf is as simple and general as possible, to let you use whatever you're
     "AB AC AD CD".split()
 
 Graphs are represented as collections of edges. Each edge is a length-2 collection of the two nodes it connects. Nodes can be any hashable, sortable data type (e.g. strings, numbers, tuples).
+
+Exact cover takes a collection of collections of nodes. Again, any python collection should be fine.
+
+    [(1, 4, 7), (1, 4), (4, 5, 7), (3, 5, 6), (2, 3, 6, 7), (2, 7)]
