@@ -44,3 +44,19 @@ for (j, digit), cons in constraints.items():
 print("\n".join(" ".join(grid[row*9:row*9+9]) for row in range(9)))
 print()
 
+# 8 puzzle
+start = 1, 5, 0, 8, 6, 7, 2, 4, 3
+goal = tuple(range(9))
+h = lambda state: sum(x != y for x, y in zip(state, range(8)))
+def neighbors(state):
+	i = state.index(8)
+	y, x = divmod(i, 3)
+	for dx, dy in [(-1, 0), (0, -1), (1, 0), (0, 1)]:
+		if 0 <= x + dx < 3 and 0 <= y + dy < 3:
+			j = (y + dy) * 3 + (x + dx)
+			s = list(state)
+			s[i], s[j] = s[j], s[i]
+			yield tuple(s)
+for state in grf.astar_uniform(start, goal, neighbors, h):
+	print(state)
+

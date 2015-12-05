@@ -40,6 +40,11 @@ class GrfTest(unittest.TestCase):
 		checkExactCover([(1, 4, 7), (1, 4), (4, 5, 7), (3, 5, 6), (2, 3, 6, 7), (2, 7)])
 		self.assertFalse(grf.exact_cover("AB BC".split()))
 
+	def testAstarUniform(self):
+		neighbors = dict(zip("ABCDEFG", "BC ACF ABDF CFE DG BCD E".split())).get
+		h = dict(zip("ABCDEFG", (2,2,2,1,0,1,0))).get
+		self.assertEqual("".join(grf.astar_uniform("A", "G", neighbors, h)), "ACDEG")
+
 if __name__ == '__main__':
 	unittest.main()
 

@@ -70,3 +70,36 @@ def exact_cover(subsets):
 	subsets = list(subsets)
 	return algox(subsets, set().union(*subsets))
 
+# https://en.wikipedia.org/wiki/A*_search_algorithm
+# A* search where every edge has uniform weight.
+# start: the starting state
+# goal: the goal state
+# neighbors(state): iterate over neighboring states
+# h(state): consistent heuristic for number of steps to goal
+def astar_uniform(start, goal, neighbors, h):
+	import heapq
+	checked = set()
+	tocheck = [(h(start), start)]
+	g = {start: 0}
+	previous = {start: None}
+	while tocheck:
+		_, state = heapq.heappop(tocheck)
+		if state == goal:
+			path = [goal]
+			while path[-1] != start:
+				path.append(previous[path[-1]])
+			return list(reversed(path))
+		checked.add(state)
+		newg = g[state] + 1
+		for newstate in neighbors(state):
+			if newstate in checked:
+				continue
+			if newstate not in g:
+				item = newg + h(state), newstate
+				heapq.heappush(tocheck, item)
+			elif newg > g[newstate]:
+				continue
+			g[newstate] = newg
+			previous[newstate] = state
+	return None
+
