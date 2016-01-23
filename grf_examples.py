@@ -1,4 +1,5 @@
 from __future__ import print_function
+from collections import defaultdict
 import grf
 
 # Knight's tour
@@ -36,11 +37,10 @@ def get_constraints(row, column, digit):
 constraints = { (row * 9 + column, digit) : list(get_constraints(row, column, digit))
 	for row in range(9) for column in range(9) for digit in "123456789" }
 used_constraints = set().union(*[cons for (j, digit), cons in constraints.items() if grid[j] == digit])
-available = list(filter(used_constraints.isdisjoint, constraints.values()))
+available = {name: cons for name, cons in constraints.items() if used_constraints.isdisjoint(cons)}
 solution = grf.exact_cover(available)
-for (j, digit), cons in constraints.items():
-	if cons in solution:
-		grid[j] = digit
+for j, digit in solution:
+	grid[j] = digit
 print("\n".join(" ".join(grid[row*9:row*9+9]) for row in range(9)))
 print()
 
@@ -59,4 +59,52 @@ def neighbors(state):
 			yield tuple(s)
 for state in grf.astar_uniform(start, goal, neighbors, h):
 	print(state)
+print()
+
+# Samurai sudoku
+
+grid = list(map(list, [
+	"6...983.7   4..15...6",
+	"...6.1...   ..96.3...",
+	"...2....4   ...8.....",
+	".6.1.78..   ..17.859.",
+	"7...4..6.   9..51...3",
+	"18593....   5....9.67",
+	".2.3......52.....1..8",
+	".......4...7.6..8....",
+	"9...84...9.4......4.9",
+	"      637...5..      ",
+	"      4.......9      ",
+	"      ..8...742      ",
+	"1.8......2.1...21...3",
+	"....3..1.7...2.......",
+	"9..7.....84......4.6.",
+	"56.4....9   ....25734",
+	"8...93..6   .8..7...1",
+	".198.52..   ..21.9.8.",
+	".....1...   1....2...",
+	"...6.74..   ...6.3...",
+	"2...49..7   3.845...2",
+]))
+def get_constraints(row, column, digit):
+	yield "f", row, column
+	yield "r", row, digit
+	yield "c", column, digit
+	yield "b", int(row // 3), int(column // 3), digit
+offsets = (0, 0), (12, 0), (6, 6), (0, 12), (12, 12)
+constraints = defaultdict(list)
+for row in range(9):
+	for column in range(9):
+		for digit in "123456789":
+			for constraint in get_constraints(row, column, digit):
+				for jgrid, (offx, offy) in enumerate(offsets):
+					constraints[(column + offx, row + offy, digit)].append((jgrid, constraint))
+used_constraints = set().union(*[cons for (x, y, digit), cons in constraints.items() if grid[y][x] == digit])
+available = {name: cons for name, cons in constraints.items() if used_constraints.isdisjoint(cons)}
+solution = grf.exact_cover(available)
+for x, y, digit in solution:
+	grid[y][x] = digit
+print("\n".join(" ".join(row) for row in grid))
+print()
+
 
