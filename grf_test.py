@@ -1,4 +1,4 @@
-import unittest
+import unittest, collections
 import grf
 
 class GrfTest(unittest.TestCase):
@@ -39,6 +39,20 @@ class GrfTest(unittest.TestCase):
 		checkExactCover("AB BC CD".split())
 		checkExactCover([(1, 4, 7), (1, 4), (4, 5, 7), (3, 5, 6), (2, 3, 6, 7), (2, 7)])
 		self.assertFalse(grf.exact_cover("AB BC".split()))
+
+	def testPartialCover(self):
+		def checkPartialCover(pieces, nodes):
+			cover = grf.partial_cover(pieces, nodes)
+			self.assertTrue(all(piece in pieces for piece in cover))
+			for node in nodes:
+				self.assertTrue(any(node in piece for piece in cover))
+			counts = collections.Counter([node for piece in cover for node in piece])
+			(_, count), = counts.most_common(1)
+			self.assertEqual(count, 1)
+		checkPartialCover("AB CD".split(), "AD")
+		checkPartialCover("AB BC CD".split(), "ABCD")
+		checkPartialCover("AB CD ACE".split(), "AD")
+		self.assertFalse(grf.partial_cover("AB BC".split(), "AC"))
 
 	def testAstarUniform(self):
 		neighbors = dict(zip("ABCDEFG", "BC ACF ABDF CFE DG BCD E".split())).get

@@ -71,3 +71,19 @@ For each of these functions, you can also optionally specify a `nodes` argument,
 
 	solution = grf.exact_cover(subsets, nodes = all_nodes)
 
+### Partial cover
+
+Partial cover is similar to exact cover, but not every node needs to appear in the solution. It takes two arguments, a collection of subsets of nodes, and a collection of nodes that must be covered.
+
+	solution = grf.partial_cover(subsets, required_nodes)
+
+Every node in `required_nodes` will appear exactly once in the solution. Every other node will appear either zero or one times.
+
+Other variations are available, as with `exact_cover`:
+
+	solutions = grf.partial_covers(subsets, nodes)
+	solutions = grf.partial_covers(subsets, nodes, max_solutions = 10)
+	solution_exists = grf.can_partial_cover(subsets, nodes)
+	solution_is_unique = grf.unique_partial_cover(subsets, nodes)
+	solution, solution_is_unique = grf.solve_unique_partial_cover(subsets, nodes)
+
