@@ -67,9 +67,29 @@ The `solve_unique_exact_cover` function returns a length-2 tuple. The first elem
 
 	solution, solution_is_unique = grf.solve_unique_exact_cover(subsets)
 
-For each of these functions, you can also optionally specify a `nodes` argument, which is a collection of all nodes. This is generally unnecessary, as the set of all nodes can be derived from the subsets. Specifying this just means no solution will be found if the set of all nodes is different from the set of nodes found in the subsets.
+For each of these functions, you can also optionally specify a `nodes` argument, which is a collection of all nodes. This is generally unnecessary, as the set of all nodes can be derived from the subsets. Specifying this just means no solution will be found if any node from the set of all nodes does not appear in any subset.
 
-	solution = grf.exact_cover(subsets, nodes = all_nodes)
+	grf.exact_cover([(1, 2), (3, 4)], nodes = [1, 2, 3, 4, 5]) => None
+	
+It is a `ValueError` for the set of all nodes to have a node appear more than once:
+
+	grf.exact_cover([(1, 2), (1, 3)], nodes = [1, 1, 2, 3]) => ValueError
+
+If a subset contains a node more than once, that subset cannot appear in a solution, although the
+repeated node is still required to be in the output:
+
+	grf.exact_cover([(1, 1), (2,)]) => None
+
+See the next section to allow for nodes to appear more than once.
+
+### Generalized exact cover
+
+The generalized problem allows nodes to appear more than once in the result, or not at all. Every
+node has a minimum number of times it must appear in the output, and a maximum number of times it
+must appear.
+
+
+
 
 ### Partial cover
 

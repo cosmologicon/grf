@@ -7,16 +7,25 @@
 #   * j-indexing subsets and working with jsubsets
 #   * auxiliary node count list
 #   * lazy evaluation of overlapping subsets (single solutions only)
+#     (actually this is no longer true with the improved overlap formula)
 #   * caching subcalls (multiple solutions only)
+#   * appending to subcall list rather than creating copy (multiple solutions only)
+# The following makes it worse:
+#   * creating a subfunction for the inner loop
 # The following make essentially no difference:
 #   * mutable vs immutable data structures
 #   * in-place updates vs creating new data structures
+#   * forgoing the final subcall when jnodes is empty
+#   * ordering of the subset iteration
+#   * caching more than just the dead branches
 
 
 from __future__ import division
-import time, random
+import time, random, math
 from collections import Counter, defaultdict
 from DancingLinksX import dlmatrix, alg_x
+
+Ttest = 1
 
 def get_inputs():
 	# Minimal example
@@ -35,11 +44,40 @@ def get_inputs():
 	available = {name: cons for name, cons in constraints.items() if used_constraints.isdisjoint(cons)}
 	yield list(available.values()), 1
 
+	# 16x16 Sudoku
+	grid = list(
+		"6..8......A.E.......A.....57.0.B..52.F8......7.3.C..2....D.38..."
+		"9..B7.3....F.2....7F86......14.....0F4.CB.E1.......A1B...2..9..5"
+		"...1..27.9....D..6.5.9..A.........D..1...4..2F7..8..5C.F..B....."
+		"..8...4B.50A.E3F.39...6...1B..0.20.E.5A..7..4.......32.........A"
+	)
+	def get_constraints(row, column, digit):
+		yield "f", row, column
+		yield "r", row, digit
+		yield "c", column, digit
+		yield "b", int(row // 4), int(column // 4), digit
+	constraints = { (row * 16 + column, digit) : list(get_constraints(row, column, digit))
+		for row in range(16) for column in range(16) for digit in "0123456789ABCDEF" }
+	used_constraints = set().union(*[cons for (j, digit), cons in constraints.items() if grid[j] == digit])
+	available = {name: cons for name, cons in constraints.items() if used_constraints.isdisjoint(cons)}
+	yield list(available.values()), 1
+	
+
 	# Dominos on a NxN grid
 	N = 6
 	tiles = [((x, y), (x + 1, y)) for x in range(N - 1) for y in range(N)]
 	tiles += [((x, y), (x, y + 1)) for x in range(N) for y in range(N - 1)]
 	yield [[x + N * y for x, y in tile] for tile in tiles], 6728
+
+	# N queens
+	N, Nsol = 10, 724
+	qs = []
+	for x in range(N):
+		for y in range(N):
+			qs.append([("x", x), ("y", y), ("d", x+y), ("b", x-y)])
+	qs += [[("d", d)] for d in range(2*N-1)]
+	qs += [[("b", b)] for b in range(-N+1, N)]
+	yield qs, Nsol
 
 def profile(algox, algox_args):
 	ret = []
@@ -53,15 +91,43 @@ def profile(algox, algox_args):
 		t0 = time.time()
 		n = 0
 		targ = 0
-		while time.time() - t0 < 1:
+		while time.time() - t0 < Ttest:
 			for _ in range(max(n, 1)):
 				targ0 = time.time()
 				args = algox_args(input)
 				targ += time.time() - targ0
 				list(algox(*args))
 				n += 1
-		ret.append((n, (time.time() - t0) / n, targ / n))
+		ret.append(n)
+		ret.append("%.3g" % ((time.time() - t0) / n))
+		ret.append("%.3g" % (targ / n))
+		ret.append("")
 	return ret
+
+
+def profilecompare(alg0, alg1):
+	algs = [alg0, alg1]
+	for input, noutput in get_inputs():
+		input = canonicalize(input)
+		n = 0
+		s = 0  # Number of times alg1 was faster
+		# p = s/n
+		# abs(p - 0.5) > z * sqrt(1/4 / n)
+		tend = time.time() + 100
+		while abs(s - n/2) ** 2 <= 25/4 * n and time.time() < tend:
+			totest = [0, 1]
+			random.shuffle(totest)
+			ts = [None, None]
+			for j in totest:
+				algox, algox_args = algs[j]
+				t0 = time.time()
+				list(algox(*algox_args(input)))
+				ts[j] = time.time() - t0
+			s += ts[1] < ts[0]
+			n += ts[1] != ts[0]
+#			print(n, s, s/n, abs(s/n - 0.5) / math.sqrt(1/4 / n))
+		print(n, s, s/n, abs(s/n - 0.5) / math.sqrt(1/4 / n))
+	
 
 def canonicalize(subsets):
 	nodes = sorted(set(node for subset in subsets for node in subset))
@@ -469,29 +535,142 @@ def algox7(matrix):
 	return solutions
 
 
-if False:
-	input, noutput = list(get_inputs())[1]
-	input = canonicalize(input)
-	args = algox2ni_args(input)
-	print(list(algox2ni(*args)))
+# All known improvements
+def algoxZ_args(subsets):
+	subsets = sorted(sorted(subset) for subset in subsets)
+	subsets = [set(subset) for subset in subsets]
+	nodes = sorted(set(node for subset in subsets for node in subset))
+	containers = [set() for node in nodes]
+	for jsubset, subset in enumerate(subsets):
+		for node in subset:
+			containers[node].add(jsubset)
+	overlappers = [set() for subset in subsets]
+	for jnode, container in enumerate(containers):
+		for jsubset in container:
+			overlappers[jsubset] |= container
+	jnodes, jsubsets = frozenset(range(len(nodes))), frozenset(range(len(subsets)))
+	node_counts = [0] * len(nodes)
+	for subset in subsets:
+		for node in subset:
+			node_counts[node] += 1
+	return jnodes, jsubsets, subsets, containers, overlappers, node_counts, set()
+def algoxZ(jnodes, jsubsets, subsets, containers, overlappers, node_counts, dead_input):
+#	print(len(jnodes))
+	if not jnodes:
+		yield []
+		return
+	if jnodes in dead_input:
+		return
+	dead = True
+	min_jnode = min(jnodes, key = node_counts.__getitem__)
+	if node_counts[min_jnode] == 0:
+		return
+	jsubset_choices = sorted(containers[min_jnode] & jsubsets)
+	for selected_jsubset in jsubset_choices:
+		removed_subsets = jsubsets & overlappers[selected_jsubset]
+		new_jsubsets = jsubsets - removed_subsets
+		new_jnodes = jnodes - subsets[selected_jsubset]
+		new_node_counts = list(node_counts)
+		for jsubset in removed_subsets:
+			for node in subsets[jsubset]:
+				new_node_counts[node] -= 1
+		for subcover in algoxZ(new_jnodes, new_jsubsets, subsets, containers, overlappers, new_node_counts, dead_input):
+			yield subcover + [selected_jsubset]
+			dead = False
+	if dead:
+		dead_input.add(jnodes)
+
+def algoxZs(jnodes, jsubsets, subsets, containers, overlappers, node_counts, subcalls):
+	def _algo(jnodes, jsubsets, node_counts):
+		if not jnodes:
+			yield []
+			return
+		key = jsubsets
+		if key in subcalls:
+			yield from subcalls[key]
+			return
+		subcalls[key] = scalls = []
+		min_jnode = min(jnodes, key = node_counts.__getitem__)
+		if node_counts[min_jnode] == 0:
+			return
+		jsubset_choices = sorted(containers[min_jnode] & jsubsets)
+		for selected_jsubset in jsubset_choices:
+			removed_subsets = jsubsets & overlappers[selected_jsubset]
+			new_jsubsets = jsubsets - removed_subsets
+			new_jnodes = jnodes - subsets[selected_jsubset]
+			new_node_counts = list(node_counts)
+			for jsubset in removed_subsets:
+				for node in subsets[jsubset]:
+					new_node_counts[node] -= 1
+			for subcover in _algo(new_jnodes, new_jsubsets, new_node_counts):
+				scalls.append(subcover + [selected_jsubset])
+				yield subcover + [selected_jsubset]
+	yield from _algo(jnodes, jsubsets, node_counts)
+
+def algoxZv(jnodes, jsubsets, subsets, containers, overlappers, node_counts, dead_input):
+#	print(len(jnodes))
+	if not jnodes:
+		yield []
+		return
+	if jnodes in dead_input:
+		return
+	dead = True
+	min_jnode = min(jnodes, key = node_counts.__getitem__)
+	if node_counts[min_jnode] == 0:
+		return
+	jsubset_choices = sorted(containers[min_jnode] & jsubsets)
+	for selected_jsubset in jsubset_choices:
+		removed_subsets = jsubsets & overlappers[selected_jsubset]
+		new_jsubsets = jsubsets - removed_subsets
+		new_jnodes = jnodes - subsets[selected_jsubset]
+		new_node_counts = list(node_counts)
+		for jsubset in removed_subsets:
+			for node in subsets[jsubset]:
+				new_node_counts[node] -= 1
+		for subcover in algoxZv(new_jnodes, new_jsubsets, subsets, containers, overlappers, new_node_counts, dead_input):
+			subcover.append(selected_jsubset)
+			yield subcover
+			dead = False
+	if dead:
+		dead_input.add(jnodes)
+
+
+if True:
+#	profilecompare((algoxZ, algoxZ_args), (algoxZs, algoxZ_args))
+#	profilecompare((algoxZ, algoxZ_args), (algox7, algox7_args))
+	profilecompare((algoxZ, algoxZ_args), (algoxZv, algoxZ_args))
+#	profilecompare((algoxZv, algoxZv2_args), (algoxZv, algoxZv_args))
 	exit()
-print("2ns", *profile(algox2ns, algox2ns_args))
-print("2nj", *profile(algox2nj, algox2nj_args))
 
-print("2n", *profile(algox2n, algox2n_args))
-print("2ni", *profile(algox2ni, algox2ni_args))
-print("2c", *profile(algox2c, algox2c_args))
+
+if False:
+	input, noutput = list(get_inputs())[2]
+	input = canonicalize(input)
+	args = algoxZ_args(input)
+	print(list(algoxZ(*args)))
+	exit()
+print("Z", *profile(algoxZ, algoxZ_args))
+print("Zv", *profile(algoxZv, algoxZ_args))
+#print("Zs", *profile(algoxZs, algoxZ_args))
+
 print(2, *profile(algox2, algox2_args))
-print("2l", *profile(algox2l, algox2l_args))
-print("2r", *profile(algox2r, algox2r_args))
-print("2o", *profile(algox2o, algox2o_args))
+if False:
+	print("2ns", *profile(algox2ns, algox2ns_args))
+	print("2nj", *profile(algox2nj, algox2nj_args))
+	print("2n", *profile(algox2n, algox2n_args))
+	print("2ni", *profile(algox2ni, algox2ni_args))
+	print("2c", *profile(algox2c, algox2c_args))
+	print("2l", *profile(algox2l, algox2l_args))
+	print("2r", *profile(algox2r, algox2r_args))
+	print("2o", *profile(algox2o, algox2o_args))
 
-print(0, *profile(algox0, algox0_args))
-print(1, *profile(algox1, algox1_args))
-print(3, *profile(algox3, algox3_args))
-print(4, *profile(algox4, algox4_args))
-print(5, *profile(algox5, algox5_args))
-print(6, *profile(algox6, algox6_args))
+if False:
+	print(0, *profile(algox0, algox0_args))
+	print(1, *profile(algox1, algox1_args))
+	print(3, *profile(algox3, algox3_args))
+	print(4, *profile(algox4, algox4_args))
+	print(5, *profile(algox5, algox5_args))
+	print(6, *profile(algox6, algox6_args))
 print(7, *profile(algox7, algox7_args))
 
 
