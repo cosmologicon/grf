@@ -109,18 +109,28 @@ def _algox_inner(jnodes, jsubsets, node_counts, subsets, containers, overlaps, d
 def _algox_outer(nodes, subsets, subset_names):
 	jnodes = frozenset(range(len(nodes)))
 	node_jnodes = { node: jnode for jnode, node in enumerate(nodes) }
-	subsets = [set(node_jnodes[node] for node in subset) for subset in subsets]
-	jsubsets = set(range(len(subsets)))
-	containers = [set() for _ in nodes]
+	node_set = set(node_jnodes)
+	subsetjs = []
+	jsubsets = set()
 	for jsubset, subset in enumerate(subsets):
-		for jnode in subset:
+		len0 = len(subset)
+		subset = set(subset)
+		if subset - node_set:
+			raise ValueError("Subset contains nodes not in set of all nodes: {}".format(list(subset - node_set)))
+		subsetj = set(node_jnodes[node] for node in subset)
+		subsetjs.append(subsetj)
+		if len(subsetj) == len0:
+			jsubsets.add(jsubset)
+	containers = [set() for _ in nodes]
+	for jsubset in jsubsets:
+		for jnode in subsetjs[jsubset]:
 			containers[jnode].add(jsubset)
 	node_counts = [len(container) for container in containers]
 	overlaps = [set() for _ in subsets]
 	for jnode, container in enumerate(containers):
 		for jsubset in container:
 			overlaps[jsubset] |= container
-	for solution in _algox_inner(jnodes, jsubsets, node_counts, subsets, containers, overlaps, set()):
+	for solution in _algox_inner(jnodes, jsubsets, node_counts, subsetjs, containers, overlaps, set()):
 		yield [subset_names[jsubset] for jsubset in solution]
 
 def _get_subset_names(subsets):
@@ -147,7 +157,8 @@ def exact_covers(subsets, nodes = None, max_solutions = None):
 	else:
 		nodes = list(nodes)
 		if len(nodes) != len(set(nodes)):
-			raise ValueError
+			multinodes = [node for node in set(nodes) if nodes.count(node) > 1]
+			raise ValueError("Invalid multiple nodes: {}".format(multinodes))
 	return _pull_items(_algox_outer(nodes, subsets, subset_names), max_solutions)
 
 def _algox(subsets, nodes, shuffle):

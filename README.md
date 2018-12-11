@@ -70,6 +70,10 @@ The `solve_unique_exact_cover` function returns a length-2 tuple. The first elem
 For each of these functions, you can also optionally specify a `nodes` argument, which is a collection of all nodes. This is generally unnecessary, as the set of all nodes can be derived from the subsets. Specifying this just means no solution will be found if any node from the set of all nodes does not appear in any subset.
 
 	grf.exact_cover([(1, 2), (3, 4)], nodes = [1, 2, 3, 4, 5]) => None
+
+If the set of all nodes is specified, it is a `ValueError` for a subset to contain a node not in the set of all nodes:
+
+	grf.exact_cover([(1, 2), (3, 4)], nodes = [1, 2, 3]) => ValueError
 	
 It is a `ValueError` for the set of all nodes to have a node appear more than once:
 
