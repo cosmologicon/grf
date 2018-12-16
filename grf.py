@@ -52,7 +52,7 @@ def hamiltonian_cycle(graph):
 # Exact cover using Algorithm X
 # http://en.wikipedia.org/wiki/Knuth%27s_Algorithm_X
 
-# Consider a sparse matrix where the jnode'th column corresponds to a node on the graph to be
+# Consider a sparse {0, 1} matrix where the jnode'th column corresponds to a node on the graph to be
 # covered, and the jsubset'th row corresponds to a subset of these nodes. The matrix is populated at
 # (jnode, jsubset) when the corresponding subset contains the corresponding node.
 

@@ -635,7 +635,7 @@ def algoxZv(jnodes, jsubsets, subsets, containers, overlappers, node_counts, dea
 		dead_input.add(jnodes)
 
 
-if True:
+if False:
 #	profilecompare((algoxZ, algoxZ_args), (algoxZs, algoxZ_args))
 #	profilecompare((algoxZ, algoxZ_args), (algox7, algox7_args))
 	profilecompare((algoxZ, algoxZ_args), (algoxZv, algoxZ_args))
