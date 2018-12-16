@@ -43,9 +43,13 @@ If you pass in a dict as input, it will be treated as a mapping from subset name
 		"D": (3, 5, 6), "E": (2, 3, 6, 7), "F": (2, 7)}
 	output: ["B", "D", "F"]
 
+If the input is an ordered container, the ordering of the subsets in the output will be the same as their ordering in the input.
+
 The `exact_cover` function will return a solution if one exists, or `None` if not:
 
 	solution = grf.exact_cover(subsets)
+
+If there are multiple solutions, an arbitrary one will be returned.
 
 The `exact_covers` function will return a list of all solutions. The list will be empty if no solution exists:
 

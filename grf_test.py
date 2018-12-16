@@ -29,10 +29,15 @@ class GrfTest(unittest.TestCase):
 		self.assertFalse(grf.hamiltonian_path("AB AC AD".split()))
 
 	def testExactCoverAPI(self):
+		self.assertEqual([], grf.exact_cover([]))
+		self.assertEqual([], grf.exact_cover({}))
+		self.assertEqual([], grf.exact_cover(""))
+		self.assertEqual([], grf.exact_cover(set()))
 		self.assertIsNotNone(grf.exact_cover([[]]))
-		self.assertIsNotNone(grf.exact_cover("AB BC CD".split()))
+		self.assertEqual(["AB", "CD"], grf.exact_cover("AB BC CD".split()))
+		self.assertEqual([0, 2], grf.exact_cover({0: "AB", 1: "BC", 2: "CD"}))
 		# The nodes argument is generally unnecessary.
-		self.assertIsNotNone(grf.exact_cover("AB BC CD".split(), "ABCD"))
+		self.assertEqual(["AB", "CD"], grf.exact_cover("AB BC CD".split(), "ABCD"))
 		# No solution will be found if any node does not appear in any subset.
 		self.assertIsNone(grf.exact_cover("AB BC CD".split(), "ABCDE"))
 		# It is a ValueError for a subset to contain a node not in the set of all nodes.
@@ -56,9 +61,15 @@ class GrfTest(unittest.TestCase):
 
 	def testExactCoversAPI(self):
 		# exact_covers
+		self.assertEqual(1, len(grf.exact_covers([])))
+		self.assertEqual(2, len(grf.exact_covers([[]])))
+		self.assertEqual(8, len(grf.exact_covers([[], [], []])))
+		self.assertEqual(2, len(grf.exact_covers([[0], []])))
+		self.assertEqual(0, len(grf.exact_covers([[0, 0], []])))
 		self.assertEqual(1, len(grf.exact_covers("AB CD".split())))
 		self.assertEqual(0, len(grf.exact_covers("AB BC".split())))
 		self.assertEqual(6, len(grf.exact_covers("A A A B B".split())))
+		self.assertEqual(6, len(grf.exact_covers("A A A B B".split(), max_solutions=10)))
 		self.assertEqual(2, len(grf.exact_covers("A A A B B".split(), max_solutions=2)))
 		# can_exact_cover
 		self.assertTrue(grf.can_exact_cover("AB CD".split()))

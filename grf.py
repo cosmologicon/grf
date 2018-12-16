@@ -112,6 +112,7 @@ def _algox_outer(nodes, subsets, subset_names):
 	node_set = set(node_jnodes)
 	subsetjs = []
 	jsubsets = set()
+	empty_jsubsets = []
 	for jsubset, subset in enumerate(subsets):
 		len0 = len(subset)
 		subset = set(subset)
@@ -119,7 +120,9 @@ def _algox_outer(nodes, subsets, subset_names):
 			raise ValueError("Subset contains nodes not in set of all nodes: {}".format(list(subset - node_set)))
 		subsetj = set(node_jnodes[node] for node in subset)
 		subsetjs.append(subsetj)
-		if len(subsetj) == len0:
+		if not len0:
+			empty_jsubsets.append(jsubset)
+		elif len(subsetj) == len0:
 			jsubsets.add(jsubset)
 	containers = [set() for _ in nodes]
 	for jsubset in jsubsets:
@@ -130,12 +133,16 @@ def _algox_outer(nodes, subsets, subset_names):
 	for jnode, container in enumerate(containers):
 		for jsubset in container:
 			overlaps[jsubset] |= container
+	empty_jsubset_sets = [[]]  # Power set of the set of jsubsets corresponding to empty subsets.
+	for empty_jsubset in empty_jsubsets:
+		empty_jsubset_sets += [jsubset_set + [empty_jsubset] for jsubset_set in empty_jsubset_sets]
 	for solution in _algox_inner(jnodes, jsubsets, node_counts, subsetjs, containers, overlaps, set()):
-		yield [subset_names[jsubset] for jsubset in solution]
+		for empty_jsubset_set in empty_jsubset_sets:
+			yield [subset_names[jsubset] for jsubset in sorted(solution + empty_jsubset_set)]
 
 def _get_subset_names(subsets):
 	if isinstance(subsets, dict):
-		subset_names, subsets = map(list, zip(*subsets.items()))
+		subset_names, subsets = map(list, zip(*subsets.items())) if subsets else ([], [])
 	else:
 		subset_names = subsets = list(subsets)
 	return subset_names, subsets
