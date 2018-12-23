@@ -56,7 +56,9 @@ def hamiltonian_cycle(graph):
 # covered, and the jsubset'th row corresponds to a subset of these nodes. The matrix is populated at
 # (jnode, jsubset) when the corresponding subset contains the corresponding node.
 
-# Exact cover Algorithm X inner loop.
+# Exact cover Algorithm X inner loop. This function runs the essential algorithmic steps, and is
+# highly optimized for real-world usage (see dlx-profile for slower alternatives).
+
 # jnodes: frozenset of jnodes that still have to be covered (i.e. the columns still in the matrix).
 #   This one needs to be a frozenset because it's used as a key for dead_cache.
 # jsubsets: set of jsubsets that are still available (i.e. the rows still in the matrix)
@@ -70,7 +72,8 @@ def hamiltonian_cycle(graph):
 #   set of rows that share at least one column with the jsubset'th row.
 # dead_cache: set containing inputs (jsubsets) known to produce no output.
 def _algox_inner(jnodes, jsubsets, node_counts, subsets, containers, overlaps, dead_cache):
-	# Base case: no nodes left to be covered - solution found.
+	# Base case: no nodes left to be covered - solution found. We make the assumption that there are
+	# no empty subsets here - these are expected to be handled specially by the outer function.
 	if not jnodes:
 		yield []
 		return

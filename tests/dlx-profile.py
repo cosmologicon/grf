@@ -113,7 +113,7 @@ def profilecompare(alg0, alg1):
 		s = 0  # Number of times alg1 was faster
 		# p = s/n
 		# abs(p - 0.5) > z * sqrt(1/4 / n)
-		tend = time.time() + 100
+		tend = time.time() + 1000
 		while abs(s - n/2) ** 2 <= 25/4 * n and time.time() < tend:
 			totest = [0, 1]
 			random.shuffle(totest)
@@ -555,11 +555,10 @@ def algoxZ_args(subsets):
 			node_counts[node] += 1
 	return jnodes, jsubsets, subsets, containers, overlappers, node_counts, set()
 def algoxZ(jnodes, jsubsets, subsets, containers, overlappers, node_counts, dead_input):
-#	print(len(jnodes))
 	if not jnodes:
 		yield []
 		return
-	if jnodes in dead_input:
+	if jsubsets in dead_input:
 		return
 	dead = True
 	min_jnode = min(jnodes, key = node_counts.__getitem__)
@@ -578,7 +577,7 @@ def algoxZ(jnodes, jsubsets, subsets, containers, overlappers, node_counts, dead
 			yield subcover + [selected_jsubset]
 			dead = False
 	if dead:
-		dead_input.add(jnodes)
+		dead_input.add(jsubsets)
 
 def algoxZs(jnodes, jsubsets, subsets, containers, overlappers, node_counts, subcalls):
 	def _algo(jnodes, jsubsets, node_counts):
@@ -608,7 +607,6 @@ def algoxZs(jnodes, jsubsets, subsets, containers, overlappers, node_counts, sub
 	yield from _algo(jnodes, jsubsets, node_counts)
 
 def algoxZv(jnodes, jsubsets, subsets, containers, overlappers, node_counts, dead_input):
-#	print(len(jnodes))
 	if not jnodes:
 		yield []
 		return
@@ -628,8 +626,7 @@ def algoxZv(jnodes, jsubsets, subsets, containers, overlappers, node_counts, dea
 			for node in subsets[jsubset]:
 				new_node_counts[node] -= 1
 		for subcover in algoxZv(new_jnodes, new_jsubsets, subsets, containers, overlappers, new_node_counts, dead_input):
-			subcover.append(selected_jsubset)
-			yield subcover
+			yield subcover + [selected_jsubset]
 			dead = False
 	if dead:
 		dead_input.add(jnodes)

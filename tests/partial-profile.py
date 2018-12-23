@@ -1,5 +1,12 @@
 # Profiling for partial cover implementation.
 
+# The question is whether it's more efficient to add pseduo-subsets to a partial cover problem to
+# reach an exact cover problem, or to tweak the exact cover algorithm to differentiate between nodes
+# and required nodes at critical points.
+
+# The answer is the latter, hands down.
+
+
 import time
 
 def exact_args(subsets):
@@ -83,7 +90,7 @@ def partial1(jnodes, jsubsets, subsets, required_jnodes, containers, overlappers
 	if not selectable_jnodes:
 		yield []
 		return
-	if jnodes in dead_input:
+	if jsubsets in dead_input:
 		return
 	dead = True
 	min_jnode = min(selectable_jnodes, key = node_counts.__getitem__)
@@ -102,7 +109,7 @@ def partial1(jnodes, jsubsets, subsets, required_jnodes, containers, overlappers
 			yield subcover + [selected_jsubset]
 			dead = False
 	if dead:
-		dead_input.add(jnodes)
+		dead_input.add(jsubsets)
 
 
 
@@ -114,7 +121,7 @@ def canonicalize(subsets, nodes):
 
 
 # N queens
-N, Nsol = 12, 724
+N, Nsol = 10, 724
 subsets = []
 for x in range(N):
 	for y in range(N):
