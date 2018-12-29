@@ -59,9 +59,9 @@ def hamiltonian_cycle(graph):
 # Exact cover Algorithm X inner loop. This function runs the essential algorithmic steps, and is
 # highly optimized for real-world usage (see dlx-profile for slower alternatives).
 
-# jnodes: frozenset of jnodes that still have to be covered (i.e. the columns still in the matrix).
+# jnodes: set of jnodes that still have to be covered (i.e. the columns still in the matrix).
+# jsubsets: frozenset of jsubsets that are still available (i.e. the rows still in the matrix).
 #   This one needs to be a frozenset because it's used as a key for dead_cache.
-# jsubsets: set of jsubsets that are still available (i.e. the rows still in the matrix)
 # node_counts: list mapping jnode to number of available subsets the node appears in, i.e. the total
 #   of the jnode'th column. (This is redundant with jsubsets, but tracked for optimization.)
 # subsets: list mapping jsubset to the set of jnodes in that subset, i.e. the set of populated
@@ -77,8 +77,8 @@ def _algox_inner(jnodes, jsubsets, node_counts, subsets, containers, overlaps, d
 	if not jnodes:
 		yield []
 		return
-	# jnodes is a sufficient cache key - node_counts and jsubsets are redundant within a given problem.
-	if dead_cache is not None and jnodes in dead_cache:
+	# jsubsets is a sufficient cache key - node_counts and jnodes are redundant within a given problem.
+	if dead_cache is not None and jsubsets in dead_cache:
 		return
 	dead = True  # If still true at the end, this input produces no outputs.
 	# Select the node that appears in the fewest subsets, i.e. the column with the fewest 1's.
@@ -104,17 +104,28 @@ def _algox_inner(jnodes, jsubsets, node_counts, subsets, containers, overlaps, d
 			yield solution
 			dead = False
 	if dead_cache is not None and dead:
-		dead_cache.add(jnodes)
+		dead_cache.add(jsubsets)
 
-# nodes: sequence of nodes.
+# Exact cover Algorithm X outer function.
+# Most of the essential logic is handled by _algox_inner. The main purpose of _algox_outer is to
+# handle edge cases and the various API options.
+
+# nodes: sequence of nodes. Nodes must be hashable and unique.
 # subsets: sequence of collections of nodes.
 # subset_names: sequence of subset names, in same order as subsets.
 def _algox_outer(nodes, subsets, subset_names):
-	jnodes = frozenset(range(len(nodes)))
+	# jnodes: each node is assigned a corresponding index (jnode), which is an integer corresponding
+	#   to that node's column index in the Algorithm X matrix.
+	jnodes = set(range(len(nodes)))
+	# Map: node => jnode
 	node_jnodes = { node: jnode for jnode, node in enumerate(nodes) }
 	node_set = set(node_jnodes)
+	# subsetj[jsubset]: the set of jnodes in the jsubset'th subset, i.e. the set of populated
+	#   columns in the jsubset'th row.
 	subsetjs = []
+	# The set of all jsubsets corresponding to non-empty subsets.
 	jsubsets = set()
+	# List of jsubsets corresponding to empty subsets.
 	empty_jsubsets = []
 	for jsubset, subset in enumerate(subsets):
 		len0 = len(subset)
@@ -127,20 +138,33 @@ def _algox_outer(nodes, subsets, subset_names):
 			empty_jsubsets.append(jsubset)
 		elif len(subsetj) == len0:
 			jsubsets.add(jsubset)
+	# containers[jnode]: the set of jsubsets that the jnode'th node is in, i.e. the set of populated
+	#   rows in the jnode'th column.
 	containers = [set() for _ in nodes]
 	for jsubset in jsubsets:
 		for jnode in subsetjs[jsubset]:
 			containers[jnode].add(jsubset)
+	# node_counts[jnode]: the number of subsets a node appears in, i.e. the sum of the jnode'th
+	#   column.
 	node_counts = [len(container) for container in containers]
+	# ksubset in overlaps[jsubset]: true if the subsets corresponding to jsubset and ksubset share
+	#   an element (intersect). 
 	overlaps = [set() for _ in subsets]
 	for jnode, container in enumerate(containers):
 		for jsubset in container:
 			overlaps[jsubset] |= container
-	empty_jsubset_sets = [[]]  # Power set of the set of jsubsets corresponding to empty subsets.
+	# Power set of the set of jsubsets corresponding to empty subsets.
+	empty_jsubset_sets = [[]]
 	for empty_jsubset in empty_jsubsets:
 		empty_jsubset_sets += [jsubset_set + [empty_jsubset] for jsubset_set in empty_jsubset_sets]
-	for solution in _algox_inner(jnodes, jsubsets, node_counts, subsetjs, containers, overlaps, set()):
+
+	for solution in _algox_inner(jnodes, frozenset(jsubsets), node_counts, subsetjs, containers, overlaps, set()):
+		# Empty subsets are not handled by the inner function (because the algorithm would never
+		# select them). But the presence or absence of an empty subset does not affect the
+		# validity of a solution. So for every solution, we add every possible set of empty subsets
+		# (including the empty set) to produce another valid solution.
 		for empty_jsubset_set in empty_jsubset_sets:
+			# Sort the solution and map the jsubsets back to subset names.
 			yield [subset_names[jsubset] for jsubset in sorted(solution + empty_jsubset_set)]
 
 def _get_subset_names(subsets):
@@ -150,6 +174,9 @@ def _get_subset_names(subsets):
 		subset_names = subsets = list(subsets)
 	return subset_names, subsets
 
+# Given a generator and a maximum number of items to pull from the generator, return a list
+# consisting of the first max_items items from the generator. Return the full list if the generator
+# becomes exhausted early, or max_items is None.
 def _pull_items(generator, max_items):
 	ret = []
 	for value in generator:
@@ -171,7 +198,7 @@ def exact_covers(subsets, nodes = None, max_solutions = None):
 			raise ValueError("Invalid multiple nodes: {}".format(multinodes))
 	return _pull_items(_algox_outer(nodes, subsets, subset_names), max_solutions)
 
-def _algox(subsets, nodes, shuffle):
+def _OLD_algox(subsets, nodes, shuffle):
 	if not nodes:
 		yield []
 		return
@@ -189,7 +216,7 @@ def _algox(subsets, nodes, shuffle):
 		for subcover in _algox(new_subsets, new_nodes, shuffle):
 			yield subcover + [selected_subset]
 
-def partial_covers(subsets, nodes, max_solutions = None):
+def _OLD_partial_covers(subsets, nodes, max_solutions = None):
 	subset_names, subsets = _get_subset_names(subsets)
 	all_nodes = set.union(*map(set, subsets))
 	if not set(nodes) <= all_nodes:
@@ -224,18 +251,97 @@ def can_unique_exact_cover(subsets, nodes = None):
 	solutions = exact_covers(subsets, nodes = nodes, max_solutions = 2)
 	return (solutions[0] if solutions else None), len(solutions) == 1
 
-def partial_cover(subsets, nodes):
-	solutions = partial_covers(subsets, nodes, max_solutions = 1)
+
+# Partial cover using a variation of Algorithm X
+
+# Same concept as exact cover, except that only certain nodes are required to be in the solution.
+# Non-required nodes may appear either 0 or 1 times in the solution.
+
+# The inner loop is identical to _algox_inner. For this to work:
+# * jnodes is jnodes for the set of required nodes.
+# * jsubsets is jsubsets for the subsets that contain at least one required node.
+# * subsets is the intersection of the given subset and the set of required node.
+# * overlappers includes subsets that overlap the given subsets, even if they only overlap in a
+#   non-requried node.
+
+# nodes: complete sequence of nodes.
+# required_nodes: collection of required nodes.
+# subsets: sequence of collections of nodes.
+# subset_names: sequence of subset names, in same order as subsets.
+def _algox_partial_outer(nodes, required_nodes, subsets, subset_names):
+	all_jnodes = set(range(len(nodes)))
+	node_jnodes = { node: jnode for jnode, node in enumerate(nodes) }
+	all_node_set = set(node_jnodes)
+	required_node_set = set(required_nodes)
+	required_jnodes = set(node_jnodes[node] for node in required_node_set)
+
+	subsetjs = []
+	required_subsetjs = []
+	jsubsets = set()
+	optional_jsubsets = []
+	for jsubset, subset in enumerate(subsets):
+		len0 = len(subset)
+		subset = set(subset)
+		if subset - all_node_set:
+			raise ValueError("Subset contains nodes not in set of all nodes: {}".format(list(subset - node_set)))
+		subsetj = set(node_jnodes[node] for node in subset)
+		required_subsetj = subsetj & required_jnodes
+		subsetjs.append(subsetj)
+		required_subsetjs.append(required_subsetj)
+		if len(subsetj) == len0:
+			if required_subsetj:
+				jsubsets.add(jsubset)
+			else:
+				optional_jsubsets.append(jsubset)
+	containers = [set() for _ in nodes]
+	for jsubset, subsetj in enumerate(subsetjs):
+		for jnode in subsetj:
+			containers[jnode].add(jsubset)
+	node_counts = [len(container) for container in containers]
+	overlaps = [set([jsubset]) for jsubset in range(len(subsets))]
+	for jnode, container in enumerate(containers):
+		for jsubset in container:
+			overlaps[jsubset] |= container
+	for solution in _algox_inner(required_jnodes, frozenset(jsubsets), node_counts, required_subsetjs, containers, overlaps, set()):
+		available = set(optional_jsubsets)
+		for jsubset in solution:
+			available -= overlaps[jsubset]
+		for solution_fill in _algox_partial_solution_fills(available, overlaps):
+			yield [subset_names[jsubset] for jsubset in sorted(solution + solution_fill)]
+def _algox_partial_solution_fills(available, overlaps):
+	if not available:
+		yield []
+		return
+	jsubset = min(available)
+	for solution_fill in _algox_partial_solution_fills(available - set([jsubset]), overlaps):
+		yield solution_fill
+	for solution_fill in _algox_partial_solution_fills(available - overlaps[jsubset], overlaps):
+		yield solution_fill + [jsubset]
+
+def partial_covers(subsets, required_nodes, max_solutions = None):
+	if max_solutions is not None and max_solutions <= 0:
+		raise ValueError
+	subset_names, subsets = _get_subset_names(subsets)
+	required_nodes = list(required_nodes)
+	required_node_set = set(required_nodes)
+	if len(required_nodes) != len(required_node_set):
+		multinodes = [node for node in set(required_nodes) if required_nodes.count(node) > 1]
+		raise ValueError("Invalid multiple nodes: {}".format(multinodes))
+	nodes = required_nodes + list(set(node for subset in subsets for node in subset if node not in required_node_set))
+	return _pull_items(_algox_partial_outer(nodes, required_nodes, subsets, subset_names), max_solutions)
+
+def partial_cover(subsets, required_nodes):
+	solutions = partial_covers(subsets, required_nodes, max_solutions = 1)
 	return solutions[0] if solutions else None
 
-def can_partial_cover(subsets, nodes):
-	return bool(partial_covers(subsets, nodes, max_solutions = 1))
+def can_partial_cover(subsets, required_nodes):
+	return bool(partial_covers(subsets, required_nodes, max_solutions = 1))
 
-def unique_partial_cover(subsets, nodes):
-	return len(partial_covers(subsets, nodes, max_solutions = 2)) == 1
+def unique_partial_cover(subsets, required_nodes):
+	return len(partial_covers(subsets, required_nodes, max_solutions = 2)) == 1
 
-def can_unique_partial_cover(subsets, nodes):
-	solutions = partial_covers(subsets, nodes, max_solutions = 2)
+def can_unique_partial_cover(subsets, required_nodes):
+	solutions = partial_covers(subsets, required_nodes, max_solutions = 2)
 	return (solutions[0] if solutions else None), len(solutions) == 1
 
 # Polyominoes are sets of grid coordinates (which are ordered pairs of integers).

@@ -107,4 +107,19 @@ for x, y, digit in solution:
 print("\n".join(" ".join(row) for row in grid))
 print()
 
+# N queens
+
+N = 32
+subsets = {}
+for x in range(N):
+	for y in range(N):
+		subsets[(x, y)] = [("x", x), ("y", y), ("d", x+y), ("b", x-y)]
+nodes = [(p, k) for p in "xy" for k in range(N)]
+solution = grf.partial_cover(subsets, nodes)
+for y in range(N):
+	print(*["Q" if (x, y) in solution else "." for x in range(N)])
+print()
+
+
+
 

@@ -12,13 +12,14 @@
 #   * appending to subcall list rather than creating copy (multiple solutions only)
 # The following makes it worse:
 #   * creating a subfunction for the inner loop
-# The following make essentially no difference:
+# The following make essentially no difference, or a very minor difference that can go either way
+# depending on the problem:
 #   * mutable vs immutable data structures
 #   * in-place updates vs creating new data structures
 #   * forgoing the final subcall when jnodes is empty
 #   * ordering of the subset iteration
 #   * caching more than just the dead branches
-
+#   * caching on the set of remaining nodes vs the set of remaining subsets
 
 from __future__ import division
 import time, random, math

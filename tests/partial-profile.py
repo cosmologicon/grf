@@ -6,7 +6,7 @@
 
 # The answer is the latter, hands down.
 
-
+from __future__ import print_function
 import time
 
 def exact_args(subsets):
@@ -83,10 +83,10 @@ def partial1_args(subsets, nodes):
 #	subsets = [subset & node_set for subset in subsets]
 #	containers = [containers[node] for node in nodes]
 #	node_counts = [node_counts[node] for node in nodes]
-	return jnodes, jsubsets, subsets, node_set, containers, overlappers, node_counts, set()
+	return jsubsets, subsets, node_set, containers, overlappers, node_counts, set()
 
-def partial1(jnodes, jsubsets, subsets, required_jnodes, containers, overlappers, node_counts, dead_input):
-	selectable_jnodes = jnodes & required_jnodes
+def partial1(jsubsets, subsets, required_jnodes, containers, overlappers, node_counts, dead_input):
+	selectable_jnodes = required_jnodes
 	if not selectable_jnodes:
 		yield []
 		return
@@ -100,12 +100,12 @@ def partial1(jnodes, jsubsets, subsets, required_jnodes, containers, overlappers
 	for selected_jsubset in jsubset_choices:
 		removed_subsets = jsubsets & overlappers[selected_jsubset]
 		new_jsubsets = jsubsets - removed_subsets
-		new_jnodes = jnodes - subsets[selected_jsubset]
+		new_required_jnodes = required_jnodes - subsets[selected_jsubset]
 		new_node_counts = list(node_counts)
 		for jsubset in removed_subsets:
 			for node in subsets[jsubset]:
 				new_node_counts[node] -= 1
-		for subcover in partial1(new_jnodes, new_jsubsets, subsets, required_jnodes, containers, overlappers, new_node_counts, dead_input):
+		for subcover in partial1(new_jsubsets, subsets, new_required_jnodes, containers, overlappers, new_node_counts, dead_input):
 			yield subcover + [selected_jsubset]
 			dead = False
 	if dead:

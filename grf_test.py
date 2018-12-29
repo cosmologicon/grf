@@ -89,7 +89,20 @@ class GrfTest(unittest.TestCase):
 		self.assertIsNone(solution)
 		self.assertFalse(solution_is_unique)
 
-	"""
+	def testPartialCoverAPI(self):
+		self.assertEqual([], grf.partial_cover([], []))
+		self.assertEqual([], grf.partial_cover({}, set()))
+		self.assertEqual([], grf.partial_cover("", ""))
+		self.assertIsNotNone(grf.partial_cover([[]], []))
+		self.assertEqual(["AB", "CD"], grf.partial_cover("AB BC CD".split(), "ABD"))
+		self.assertEqual([0, 2], grf.partial_cover({0: "AB", 1: "BC", 2: "CD"}, "ABD"))
+		# No solution will be found if any node does not appear in any subset.
+		self.assertIsNone(grf.partial_cover("AB BC CD".split(), "ABCDE"))
+		# It is a ValueError for the set of all nodes to have a node appear more than once.
+		self.assertRaises(ValueError, grf.partial_cover, "AB BC CD".split(), "ABCDD")
+		# If a subset contains a node more than once, that subset cannot appear in a solution.
+		self.assertIsNone(grf.partial_cover("AA B".split(), "AB"))
+
 	def testPartialCover(self):
 		def checkPartialCover(pieces, nodes):
 			cover = grf.partial_cover(pieces, nodes)
@@ -103,7 +116,14 @@ class GrfTest(unittest.TestCase):
 		checkPartialCover("AB BC CD".split(), "ABCD")
 		checkPartialCover("AB CD ACE".split(), "AD")
 		self.assertFalse(grf.partial_cover("AB BC".split(), "AC"))
-	"""
+
+	def testPartialCoversAPI(self):
+		# Empty and optional subsets.
+		self.assertEqual(1, len(grf.partial_covers([], [])))
+		self.assertEqual(2, len(grf.partial_covers([[]], [])))
+		self.assertEqual(8, len(grf.partial_covers([[], [], []], [])))
+		self.assertEqual(8, len(grf.partial_covers([[0], [1], [2]], [])))
+		self.assertEqual(5, len(grf.partial_covers([[0, 1], [1, 2], [2, 3]], [])))
 
 	def testAstarUniform(self):
 		neighbors = dict(zip("ABCDEFG", "BC ACF ABDF CFE DG BCD E".split())).get
