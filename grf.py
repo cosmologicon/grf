@@ -322,42 +322,83 @@ def can_unique_partial_cover(subsets, required_nodes):
 #   in the jsubset'th subset.
 # jsubset in containers[jnode]: true if subsets[jsubset][jnode] > 0
 
-def _algox_multi_inner(jnodes, jnode_mins, jnode_maxes, jsubsets, node_totals, subsets, containers, dead_cache):
+def _algox_multi_inner(jnodes, jnode_mins, jnode_maxes, jsubsets, node_totals, partial_solution, subsets, containers, dead_cache):
 	if not jnodes:
-		yield []
+		yield list(partial_solution)
 		return
-	if dead_cache is not None and jsubsets in dead_cache:
+	dead_key = partial_solution
+	if dead_cache is not None and dead_key in dead_cache:
 		return
 	dead = True
-	selected_jnode = min(jnodes, key = lambda jnode: node_totals[jnode] - jnode_mins[jnode])
-	if node_totals[selected_jnode] < jnode_mins[selected_jnode]:
+	# This part's a bit tricky. How do we generalize the idea of choosing the node that belongs to
+	# the fewest subsets? After a lot of trial and error, this seems to be a pretty good choice,
+	# although I suspect that further refinement is possible.
+	# First, consider the nodes for which the quantity (sum of jnode'th column - node's requirement)
+	# is minimized.
+	min_total = min(node_totals[jnode] - jnode_mins[jnode] for jnode in jnodes)
+	if min_total < 0:
 		return
-	selected_jsubsets = list(containers[selected_jnode] & jsubsets)
-	random.shuffle(selected_jsubsets)
-	for selected_jsubset in selected_jsubsets:
-		sub_jnodes = set(jnodes)
-		sub_jnode_mins = list(jnode_mins)
-		sub_jnode_maxes = list(jnode_maxes)
-		sub_node_totals = list(node_totals)
-		removed_jsubsets = set([selected_jsubset])
-		for jnode, nnode in subsets[selected_jsubset].items():
-			sub_jnode_mins[jnode] -= nnode
-			sub_jnode_maxes[jnode] -= nnode
-			if jnode in sub_jnodes and sub_jnode_mins[jnode] <= 0:
-				sub_jnodes.remove(jnode)
-			for jsubset in containers[jnode] & jsubsets:
-				if jsubset != selected_jsubset and subsets[jsubset][jnode] > sub_jnode_maxes[jnode]:
-					removed_jsubsets.add(jsubset)
-		sub_jsubsets = jsubsets - frozenset(removed_jsubsets)
-		for jsubset in removed_jsubsets:
-			for knode, mnode in subsets[jsubset].items():
-				sub_node_totals[knode] -= mnode
-		for solution in _algox_multi_inner(sub_jnodes, sub_jnode_mins, sub_jnode_maxes, sub_jsubsets, sub_node_totals, subsets, containers, dead_cache):
-			solution.append(selected_jsubset)
+	selectable_jnodes = [jnode for jnode in jnodes if node_totals[jnode] - jnode_mins[jnode] == min_total]
+	# Then, break ties between these nodes by counting all possible sets of subsets that could meet
+	# that node's requirement, without violating some other node's maximum. Choose the node for
+	# which the number of such sets is minimized.
+	jnode_coverings = {}
+	for jnode in selectable_jnodes:
+		available = list(containers[jnode] & jsubsets)
+		available_total = sum(subsets[jsubset][jnode] for jsubset in available)
+		jnode_coverings[jnode] = list(_algox_multi_node_coverings(jnode, available, available_total,
+			jnodes, jnode_mins, jnode_maxes, jsubsets, node_totals, partial_solution,
+			subsets, containers))
+	selected_jnode = min(selectable_jnodes, key = lambda jnode: len(jnode_coverings[jnode]))
+	sub_args = jnode_coverings[selected_jnode]
+	random.shuffle(sub_args)
+	for sub_jnodes, sub_jnode_mins, sub_jnode_maxes, sub_jsubsets, sub_node_totals, sub_partial_solution in sub_args:
+		for solution in _algox_multi_inner(sub_jnodes, sub_jnode_mins, sub_jnode_maxes, sub_jsubsets, sub_node_totals, sub_partial_solution, subsets, containers, dead_cache):
 			yield solution
 			dead = False
 	if dead_cache is not None and dead:
-		dead_cache.add(jsubsets)
+		dead_cache.add(dead_key)
+#		if len(dead_cache) % 1000 == 0:
+#			sizes = Counter(map(len, dead_cache))
+#			print(len(dead_cache), *[sizes[s] for s in range(max(sizes) + 1)])
+def _algox_multi_node_coverings(selected_jnode, available, available_total, jnodes, jnode_mins, jnode_maxes, jsubsets, node_totals, partial_solution, subsets, containers):
+	if selected_jnode not in jnodes:
+		yield jnodes, jnode_mins, jnode_maxes, jsubsets, node_totals, partial_solution
+		return
+	if available_total < jnode_mins[selected_jnode]:
+		return
+	selected_jsubset = available.pop()
+	available_total -= subsets[selected_jsubset][selected_jnode]
+	# Don't select the subset
+	for covering in _algox_multi_node_coverings(selected_jnode, list(available), available_total, jnodes, jnode_mins, jnode_maxes, jsubsets, node_totals, partial_solution, subsets, containers):
+		yield covering
+	# Select the subset
+	sub_jnodes = set(jnodes)
+	sub_jnode_mins = list(jnode_mins)
+	sub_jnode_maxes = list(jnode_maxes)
+	removed_jsubsets = set([selected_jsubset])
+	for jnode, nnode in subsets[selected_jsubset].items():
+		sub_jnode_mins[jnode] -= nnode
+		sub_jnode_maxes[jnode] -= nnode
+		if jnode in sub_jnodes and sub_jnode_mins[jnode] <= 0:
+			sub_jnodes.remove(jnode)
+		for jsubset in containers[jnode] & jsubsets:
+			if jsubset != selected_jsubset and subsets[jsubset][jnode] > sub_jnode_maxes[jnode]:
+				removed_jsubsets.add(jsubset)
+	sub_jsubsets = jsubsets - frozenset(removed_jsubsets)
+	sub_node_totals = list(node_totals)
+	for jsubset in removed_jsubsets:
+		for knode, mnode in subsets[jsubset].items():
+			sub_node_totals[knode] -= mnode
+			if sub_node_totals[knode] < sub_jnode_mins[knode]:
+				return
+	sub_partial_solution = partial_solution | frozenset([selected_jsubset])
+	for covering in _algox_multi_node_coverings(selected_jnode, available, available_total,
+			sub_jnodes, sub_jnode_mins, sub_jnode_maxes, sub_jsubsets, sub_node_totals, sub_partial_solution,
+			subsets, containers):
+		yield covering
+
+
 # node_mins: list of (node, node_count) pairs
 # node_maxes: list of (node, node_count) pairs
 # subsets: list of subsets. Each subset must be list of (node, node_count) pairs
@@ -397,7 +438,7 @@ def _algox_multi_outer(node_mins, node_maxes, subsets, subset_names):
 			node_totals[jnode] += count
 	# TODO: is there some better way to avoid generating solutions multiple times.
 	full_solutions = set()
-	for solution in _algox_multi_inner(jnodes, jnode_mins, jnode_maxes, frozenset(jsubsets), node_totals, subsetjs, containers, set()):
+	for solution in _algox_multi_inner(jnodes, jnode_mins, jnode_maxes, jsubsets, node_totals, frozenset(), subsetjs, containers, set()):
 		# TODO: try removing the solution fills and just continue in the inner function.
 		available = set(jsubsets) - set(solution)
 		extra_jnode_counts = list(jnode_maxes)
@@ -450,6 +491,15 @@ def multi_covers(subsets, node_mins, node_maxes, max_solutions = None):
 		node_mins = [(node, node_mins) for node in all_nodes]
 	if isinstance(node_maxes, int):
 		node_maxes = [(node, node_maxes) for node in all_nodes]
+
+
+
+
+	node_mins.sort(key = hash)
+
+
+
+
 	return _pull_items(_algox_multi_outer(node_mins, node_maxes, normalized_subsets, subset_names), max_solutions)
 
 def multi_cover(subsets, node_mins, node_maxes):

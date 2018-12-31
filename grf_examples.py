@@ -124,22 +124,43 @@ print()
 # Star Battle
 
 grid = [list(line.strip()) for line in """
-aaaabbcccc
-adaabbbcbb
-addbbbbbbb
-ddddbeeeeb
-ddbbbbbbeb
-ffffgghhhh
-fiffggghgg
-fiiggggggg
-iiiigjjjjg
-iiggggggjg
-""".strip().splitlines()]
+AAAABBCCCC
+ADAABBBCBB
+ADDBBBBBBB
+DDDDBEEEEB
+DDBBBBBBEB
+FFFFGGHHHH
+FIFFGGGHGG
+FIIGGGGGGG
+IIIIGJJJJG
+IIGGGGGGJG
+""".lower().strip().splitlines()]
+N, S = 10, 2
+
+grid = [list(line.strip()) for line in """
+AAAAABBBBBCCCCC
+ADDDDBBBBBEEECC
+ADDDDDDBEEEEEEC
+ADDDFDDBEEGEEEC
+ADDFFFHHHGGGEEC
+AAAFFFHHHGGGCCC
+AAHHFHHIHHGHCCC
+AAAHHHIIIHHHJJJ
+AAAKKKIIIKKKKLJ
+AAAMKKKIKKKMLLJ
+NNNMMKKKKKMMLLJ
+NNNOMMMMMMMLLLJ
+NOOOOMMMMMOOLLL
+NOOOOOMMMOOOLLL
+NNOOOOOOOOOOLLL
+""".lower().strip().splitlines()]
+N, S = 15, 3
+
 subsets = {}
-for y in range(10):
-	for x in range(10):
-		xs = [x] if x == 0 else [x-1] if x == 9 else [x-1, x]
-		ys = [y] if y == 0 else [y-1] if y == 9 else [y-1, y]
+for y in range(N):
+	for x in range(N):
+		xs = [x] if x == 0 else [x-1] if x == N-1 else [x-1, x]
+		ys = [y] if y == 0 else [y-1] if y == N-1 else [y-1, y]
 		subsets[(x, y)] = [
 			grid[y][x],
 			("x", x),
@@ -147,14 +168,15 @@ for y in range(10):
 		] + [("s", a, b) for a in xs for b in ys]
 node_mins = {}
 node_maxes = {}
-regions = list(set(letter for line in grid for letter in line)) + [(p, n) for p in "xy" for n in range(10)]
+regions = list(set(letter for line in grid for letter in line)) + [(p, n) for p in "xy" for n in range(N)]
 for region in regions:
-	node_mins[region] = node_maxes[region] = 2
-for x in range(9):
-	for y in range(9):
+	node_mins[region] = node_maxes[region] = S
+for x in range(N-1):
+	for y in range(N-1):
 		node_mins[("s", x, y)] = 0
 		node_maxes[("s", x, y)] = 1
-for x, y in grf.multi_cover(subsets, node_mins, node_maxes):
+solution = grf.multi_cover(subsets, node_mins, node_maxes)
+for x, y in solution:
 	grid[y][x] = grid[y][x].upper()
 for line in grid:
 	print(*line)
