@@ -121,5 +121,42 @@ for y in range(N):
 print()
 
 
+# Star Battle
 
+grid = [list(line.strip()) for line in """
+aaaabbcccc
+adaabbbcbb
+addbbbbbbb
+ddddbeeeeb
+ddbbbbbbeb
+ffffgghhhh
+fiffggghgg
+fiiggggggg
+iiiigjjjjg
+iiggggggjg
+""".strip().splitlines()]
+subsets = {}
+for y in range(10):
+	for x in range(10):
+		xs = [x] if x == 0 else [x-1] if x == 9 else [x-1, x]
+		ys = [y] if y == 0 else [y-1] if y == 9 else [y-1, y]
+		subsets[(x, y)] = [
+			grid[y][x],
+			("x", x),
+			("y", y),
+		] + [("s", a, b) for a in xs for b in ys]
+node_mins = {}
+node_maxes = {}
+regions = list(set(letter for line in grid for letter in line)) + [(p, n) for p in "xy" for n in range(10)]
+for region in regions:
+	node_mins[region] = node_maxes[region] = 2
+for x in range(9):
+	for y in range(9):
+		node_mins[("s", x, y)] = 0
+		node_maxes[("s", x, y)] = 1
+for x, y in grf.multi_cover(subsets, node_mins, node_maxes):
+	grid[y][x] = grid[y][x].upper()
+for line in grid:
+	print(*line)
+print()
 

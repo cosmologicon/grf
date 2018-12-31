@@ -125,6 +125,45 @@ class GrfTest(unittest.TestCase):
 		self.assertEqual(8, len(grf.partial_covers([[0], [1], [2]], [])))
 		self.assertEqual(5, len(grf.partial_covers([[0, 1], [1, 2], [2, 3]], [])))
 
+	def testMultiCoversAPI(self):
+		self.assertEqual(1, len(grf.multi_covers([], [], [])))
+		self.assertEqual(2, len(grf.multi_covers([[]], [], [])))
+		self.assertEqual(8, len(grf.multi_covers([[], [], []], [], [])))
+		self.assertEqual(1, len(grf.multi_covers([[0]], [(0, 1)], [(0, 1)])))
+		self.assertEqual(6, len(grf.multi_covers([[0], [0], [0]], [(0, 1)], [(0, 2)])))
+		self.assertEqual(4, len(grf.multi_covers([[0], {0: 1}, {0: 2}], [(0, 1)], [(0, 2)])))
+		self.assertEqual(1, len(grf.multi_covers([[0], [0]], [(0, 0)], [(0, 0)])))
+		self.assertEqual(3, len(grf.multi_covers([[0], [0]], [(0, 1)], [(0, 3)])))
+		
+		# exact_covers
+		self.assertEqual(1, len(grf.exact_covers([])))
+		self.assertEqual(2, len(grf.exact_covers([[]])))
+		self.assertEqual(8, len(grf.exact_covers([[], [], []])))
+		self.assertEqual(2, len(grf.exact_covers([[0], []])))
+		self.assertEqual(0, len(grf.exact_covers([[0, 0], []])))
+		self.assertEqual(1, len(grf.exact_covers("AB CD".split())))
+		self.assertEqual(0, len(grf.exact_covers("AB BC".split())))
+		self.assertEqual(6, len(grf.exact_covers("A A A B B".split())))
+		self.assertEqual(6, len(grf.exact_covers("A A A B B".split(), max_solutions=10)))
+		self.assertEqual(2, len(grf.exact_covers("A A A B B".split(), max_solutions=2)))
+		# can_exact_cover
+		self.assertTrue(grf.can_exact_cover("AB CD".split()))
+		self.assertFalse(grf.can_exact_cover("AB BC".split()))
+		# unique_exact_cover
+		self.assertTrue(grf.unique_exact_cover("AB CD".split()))
+		self.assertFalse(grf.unique_exact_cover("AB BC".split()))
+		self.assertFalse(grf.unique_exact_cover("AB CD AD BC".split()))
+		# can_unique_exact_cover
+		solution, solution_is_unique = grf.can_unique_exact_cover("AB CD AD BC".split())
+		self.assertIsNotNone(solution)
+		self.assertFalse(solution_is_unique)
+		solution, solution_is_unique = grf.can_unique_exact_cover("AB CD AD".split())
+		self.assertIsNotNone(solution)
+		self.assertTrue(solution_is_unique)
+		solution, solution_is_unique = grf.can_unique_exact_cover("AB BC".split())
+		self.assertIsNone(solution)
+		self.assertFalse(solution_is_unique)
+
 	def testAstarUniform(self):
 		neighbors = dict(zip("ABCDEFG", "BC ACF ABDF CFE DG BCD E".split())).get
 		h = dict(zip("ABCDEFG", (2,2,2,1,0,1,0))).get

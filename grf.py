@@ -56,6 +56,11 @@ def hamiltonian_cycle(graph):
 # covered, and the jsubset'th row corresponds to a subset of these nodes. The matrix is populated at
 # (jnode, jsubset) when the corresponding subset contains the corresponding node.
 
+# We do NOT implement Dancing Links. That may be the best way in some languages, but profiling
+# showed that a more straightforward implementation of rows as sets was easily more efficient in
+# Python. See dlx-profile.py for details.
+
+
 # Exact cover Algorithm X inner loop. This function runs the essential algorithmic steps, and is
 # highly optimized for real-world usage (see dlx-profile for slower alternatives).
 
@@ -131,7 +136,7 @@ def _algox_outer(nodes, subsets, subset_names):
 		len0 = len(subset)
 		subset = set(subset)
 		if subset - node_set:
-			raise ValueError("Subset contains nodes not in set of all nodes: {}".format(list(subset - node_set)))
+			raise ValueError("Subset contains nodes not in set of all nodes: {}".format(subset - node_set))
 		subsetj = set(node_jnodes[node] for node in subset)
 		subsetjs.append(subsetj)
 		if not len0:
@@ -198,45 +203,6 @@ def exact_covers(subsets, nodes = None, max_solutions = None):
 			raise ValueError("Invalid multiple nodes: {}".format(multinodes))
 	return _pull_items(_algox_outer(nodes, subsets, subset_names), max_solutions)
 
-def _OLD_algox(subsets, nodes, shuffle):
-	if not nodes:
-		yield []
-		return
-	node_counts = Counter(node for subset in subsets for node in subset)
-	if len(node_counts) < len(nodes):
-		return
-	selected_node = min(nodes, key = node_counts.get)
-	subset_choices = [subset for subset in subsets if selected_node in subset]
-	if shuffle:
-		random.shuffle(subset_choices)
-	for selected_subset in subset_choices:
-		new_nodes = [node for node in nodes if node not in selected_subset]
-		isvalid = set(selected_subset).isdisjoint
-		new_subsets = [subset for subset in subsets if isvalid(set(subset))]
-		for subcover in _algox(new_subsets, new_nodes, shuffle):
-			yield subcover + [selected_subset]
-
-def _OLD_partial_covers(subsets, nodes, max_solutions = None):
-	subset_names, subsets = _get_subset_names(subsets)
-	all_nodes = set.union(*map(set, subsets))
-	if not set(nodes) <= all_nodes:
-		return []
-	index_to_node = list(all_nodes)
-	node_to_index = {node: j for j, node in enumerate(index_to_node)}
-	index_subsets = [tuple(map(node_to_index.get, subset)) for subset in subsets]
-	index_nodes = [node_to_index[node] for node in nodes]
-	solutions = []
-	shuffle = max_solutions is not None
-	for index_solution in _algox(index_subsets, index_nodes, shuffle):
-		solution = []
-		for index_subset in index_solution:
-			subset = subset_names[index_subsets.index(index_subset)]
-			solution.append(subset)
-		solutions.append(solution)
-		if max_solutions is not None and len(solutions) == max_solutions:
-			return solutions
-	return solutions
-
 def exact_cover(subsets, nodes = None):
 	solutions = exact_covers(subsets, nodes = nodes, max_solutions = 1)
 	return solutions[0] if solutions else None
@@ -283,7 +249,7 @@ def _algox_partial_outer(nodes, required_nodes, subsets, subset_names):
 		len0 = len(subset)
 		subset = set(subset)
 		if subset - all_node_set:
-			raise ValueError("Subset contains nodes not in set of all nodes: {}".format(list(subset - node_set)))
+			raise ValueError("Subset contains nodes not in set of all nodes: {}".format(subset - all_node_set))
 		subsetj = set(node_jnodes[node] for node in subset)
 		required_subsetj = subsetj & required_jnodes
 		subsetjs.append(subsetj)
@@ -343,6 +309,163 @@ def unique_partial_cover(subsets, required_nodes):
 def can_unique_partial_cover(subsets, required_nodes):
 	solutions = partial_covers(subsets, required_nodes, max_solutions = 2)
 	return (solutions[0] if solutions else None), len(solutions) == 1
+
+
+# Multi cover using a variation of Algorithm X.
+
+# This is a generalization of exact cover that also includes partial cover. In this problem, every
+# node has assigned a minimum number of times it must appear in the solution, and a maximum number
+# of times it can appear in the solution. Futhermore subsets of nodes are multisets, that may
+# include a given node any number of times.
+
+# subsets[jsubset: {jnode: nnode} giving the number of times the jnode'th node appears
+#   in the jsubset'th subset.
+# jsubset in containers[jnode]: true if subsets[jsubset][jnode] > 0
+
+def _algox_multi_inner(jnodes, jnode_mins, jnode_maxes, jsubsets, node_totals, subsets, containers, dead_cache):
+	if not jnodes:
+		yield []
+		return
+	if dead_cache is not None and jsubsets in dead_cache:
+		return
+	dead = True
+	selected_jnode = min(jnodes, key = lambda jnode: node_totals[jnode] - jnode_mins[jnode])
+	if node_totals[selected_jnode] < jnode_mins[selected_jnode]:
+		return
+	selected_jsubsets = list(containers[selected_jnode] & jsubsets)
+	random.shuffle(selected_jsubsets)
+	for selected_jsubset in selected_jsubsets:
+		sub_jnodes = set(jnodes)
+		sub_jnode_mins = list(jnode_mins)
+		sub_jnode_maxes = list(jnode_maxes)
+		sub_node_totals = list(node_totals)
+		removed_jsubsets = set([selected_jsubset])
+		for jnode, nnode in subsets[selected_jsubset].items():
+			sub_jnode_mins[jnode] -= nnode
+			sub_jnode_maxes[jnode] -= nnode
+			if jnode in sub_jnodes and sub_jnode_mins[jnode] <= 0:
+				sub_jnodes.remove(jnode)
+			for jsubset in containers[jnode] & jsubsets:
+				if jsubset != selected_jsubset and subsets[jsubset][jnode] > sub_jnode_maxes[jnode]:
+					removed_jsubsets.add(jsubset)
+		sub_jsubsets = jsubsets - frozenset(removed_jsubsets)
+		for jsubset in removed_jsubsets:
+			for knode, mnode in subsets[jsubset].items():
+				sub_node_totals[knode] -= mnode
+		for solution in _algox_multi_inner(sub_jnodes, sub_jnode_mins, sub_jnode_maxes, sub_jsubsets, sub_node_totals, subsets, containers, dead_cache):
+			solution.append(selected_jsubset)
+			yield solution
+			dead = False
+	if dead_cache is not None and dead:
+		dead_cache.add(jsubsets)
+# node_mins: list of (node, node_count) pairs
+# node_maxes: list of (node, node_count) pairs
+# subsets: list of subsets. Each subset must be list of (node, node_count) pairs
+# subset_names: list of subset identifiers
+def _algox_multi_outer(node_mins, node_maxes, subsets, subset_names):
+	all_nodes, jnode_mins = zip(*node_mins) if node_mins else ([], [])
+	all_node_set = set(all_nodes)
+	max_nodes, _ = zip(*node_maxes) if node_maxes else ([], [])
+	max_node_set = set(max_nodes)
+	if all_node_set - max_node_set:
+		raise ValueError("Nodes assigned min count but not max count: {}".format(all_node_set - max_node_set))
+	if max_node_set - all_node_set:
+		raise ValueError("Nodes assigned max count but not min count: {}".format(max_node_set - all_node_set))
+	subset_nodes = set(node for subset in subsets for node, _ in subset)
+	if subset_nodes - all_node_set:
+		raise ValueError("Nodes in subsets not assigned counts: {}".format(subset_nodes - all_node_set))
+	node_jnodes = { node: jnode for jnode, node in enumerate(all_nodes) }
+	jnodes = set(jnode for jnode, count in enumerate(jnode_mins) if count > 0)
+	jnode_maxes = [None] * len(all_nodes)
+	for node, count in node_maxes:
+		jnode_maxes[node_jnodes[node]] = count
+
+	subsetjs = []
+	jsubsets = set()
+	for jsubset, subset in enumerate(subsets):
+		subsetj = { node_jnodes[node]: count for node, count in subset }
+		subsetjs.append(subsetj)
+		if all(jnode_maxes[jnode] >= count for jnode, count in subsetj.items()):
+			jsubsets.add(jsubset)
+	containers = [set() for _ in all_nodes]
+	node_totals = [0] * len(all_nodes)
+	for jsubset, subsetj in enumerate(subsetjs):
+		for jnode, count in subsetj.items():
+			if not isinstance(count, int) or count <= 0:
+				raise ValueError("Invalid node count {} in subset {}".format(count, subsets[jsubset]))
+			containers[jnode].add(jsubset)
+			node_totals[jnode] += count
+	# TODO: is there some better way to avoid generating solutions multiple times.
+	full_solutions = set()
+	for solution in _algox_multi_inner(jnodes, jnode_mins, jnode_maxes, frozenset(jsubsets), node_totals, subsetjs, containers, set()):
+		# TODO: try removing the solution fills and just continue in the inner function.
+		available = set(jsubsets) - set(solution)
+		extra_jnode_counts = list(jnode_maxes)
+		for jsubset in solution:
+			for jnode, count in subsetjs[jsubset].items():
+				extra_jnode_counts[jnode] -= count
+		available = sorted(jsubset for jsubset in available if all(extra_jnode_counts[jnode] >= count for jnode, count in subsetjs[jsubset].items()))
+		for solution_fill in _algox_multi_solution_fills(available, extra_jnode_counts, subsetjs):
+			full_solution = sorted(solution + solution_fill)
+			if tuple(full_solution) in full_solutions:
+				continue
+			yield [subset_names[jsubset] for jsubset in full_solution]
+			full_solutions.add(tuple(full_solution))
+def _algox_multi_solution_fills(available, extra_jnode_counts, subsetjs):
+	if not available:
+		yield []
+		return
+	jsubset = available.pop()
+	for	solution_fill in _algox_multi_solution_fills(list(available), extra_jnode_counts, subsetjs):
+		yield solution_fill
+	if all(extra_jnode_counts[jnode] >= count for jnode, count in subsetjs[jsubset].items()):
+		extra_jnode_counts = list(extra_jnode_counts)
+		for jnode, count in subsetjs[jsubset].items():
+			extra_jnode_counts[jnode] -= count
+		for solution_fill in _algox_multi_solution_fills(available, extra_jnode_counts, subsetjs):
+			yield solution_fill + [jsubset]
+
+def multi_covers(subsets, node_mins, node_maxes, max_solutions = None):
+	if max_solutions is not None and max_solutions <= 0:
+		raise ValueError
+	subset_names, subsets = _get_subset_names(subsets)
+	normalized_subsets = []
+	for subset in subsets:
+		if isinstance(subset, dict):
+			normalized_subsets.append(list(subset.items()))
+		else:
+			normalized_subsets.append(list(Counter(subset).items()))
+	all_nodes = set(node for subset in normalized_subsets for node, _ in subset)
+	if isinstance(node_mins, dict):
+		all_nodes |= set(node_mins)
+		node_mins = list(node_mins.items())
+	elif not isinstance(node_mins, int):
+		all_nodes |= set(node for node, count in node_mins)
+	if isinstance(node_maxes, dict):
+		all_nodes |= set(node_maxes)
+		node_maxes = list(node_maxes.items())
+	elif not isinstance(node_maxes, int):
+		all_nodes |= set(node for node, count in node_maxes)
+	if isinstance(node_mins, int):
+		node_mins = [(node, node_mins) for node in all_nodes]
+	if isinstance(node_maxes, int):
+		node_maxes = [(node, node_maxes) for node in all_nodes]
+	return _pull_items(_algox_multi_outer(node_mins, node_maxes, normalized_subsets, subset_names), max_solutions)
+
+def multi_cover(subsets, node_mins, node_maxes):
+	solutions = multi_covers(subsets, node_mins, node_maxes, max_solutions = 1)
+	return solutions[0] if solutions else None
+
+def can_multi_cover(subsets, node_mins, node_maxes):
+	return bool(multi_covers(subsets, node_mins, node_maxes, max_solutions = 1))
+
+def unique_multi_cover(subsets, node_mins, node_maxes):
+	return len(multi_covers(subsets, node_mins, node_maxes, max_solutions = 2)) == 1
+
+def can_unique_multi_cover(subsets, node_mins, node_maxes):
+	solutions = multi_covers(subsets, node_mins, node_maxes, max_solutions = 2)
+	return (solutions[0] if solutions else None), len(solutions) == 1
+
 
 # Polyominoes are sets of grid coordinates (which are ordered pairs of integers).
 #   Example: ((0, 0), (1, 0), (1, 1), (2, 1))
