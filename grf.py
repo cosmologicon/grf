@@ -322,6 +322,11 @@ def can_unique_partial_cover(subsets, required_nodes):
 #   in the jsubset'th subset.
 # jsubset in containers[jnode]: true if subsets[jsubset][jnode] > 0
 
+def _choose(n, k):
+	if not 0 <= k <= n:
+		return 0
+	return 1 if k == 0 else _choose(n, k-1) * (n - k + 1) / k
+
 def _algox_multi_inner(jnodes, jnode_mins, jnode_maxes, jsubsets, node_totals, partial_solution, subsets, containers, dead_cache):
 	if not jnodes:
 		yield list(partial_solution)
@@ -335,10 +340,10 @@ def _algox_multi_inner(jnodes, jnode_mins, jnode_maxes, jsubsets, node_totals, p
 	# although I suspect that further refinement is possible.
 	# First, consider the nodes for which the quantity (sum of jnode'th column - node's requirement)
 	# is minimized.
-	min_total = min(node_totals[jnode] - jnode_mins[jnode] for jnode in jnodes)
+	min_total = min(_choose(node_totals[jnode], jnode_mins[jnode]) for jnode in jnodes)
 	if min_total < 0:
 		return
-	selectable_jnodes = [jnode for jnode in jnodes if node_totals[jnode] - jnode_mins[jnode] == min_total]
+	selectable_jnodes = [jnode for jnode in jnodes if _choose(node_totals[jnode], jnode_mins[jnode]) == min_total]
 	# Then, break ties between these nodes by counting all possible sets of subsets that could meet
 	# that node's requirement, without violating some other node's maximum. Choose the node for
 	# which the number of such sets is minimized.
@@ -466,9 +471,20 @@ def _algox_multi_solution_fills(available, extra_jnode_counts, subsetjs):
 		for solution_fill in _algox_multi_solution_fills(available, extra_jnode_counts, subsetjs):
 			yield solution_fill + [jsubset]
 
-def multi_covers(subsets, node_mins, node_maxes, max_solutions = None):
+def multi_covers(subsets, node_mins = None, node_maxes = None, node_ranges = None, max_solutions = None):
 	if max_solutions is not None and max_solutions <= 0:
 		raise ValueError
+	if (node_mins is None) != (node_maxes is None):
+		raise ValueError("node_mins and node_maxes must be specified together.")
+	if (node_mins is None) == (node_ranges is None):
+		raise ValueError("Must set exactly one of node_mins/maxes or node_ranges.")
+	if node_ranges is not None:
+		node_mins, node_maxes = {}, {}
+		for node, count in (node_ranges.items() if isinstance(node_ranges, dict) else node_ranges):
+			if isinstance(count, (int, float)):
+				node_mins[node] = node_maxes[node] = count
+			else:
+				node_mins[node], node_maxes[node] = count
 	subset_names, subsets = _get_subset_names(subsets)
 	normalized_subsets = []
 	for subset in subsets:
@@ -491,29 +507,20 @@ def multi_covers(subsets, node_mins, node_maxes, max_solutions = None):
 		node_mins = [(node, node_mins) for node in all_nodes]
 	if isinstance(node_maxes, int):
 		node_maxes = [(node, node_maxes) for node in all_nodes]
-
-
-
-
-	node_mins.sort(key = hash)
-
-
-
-
 	return _pull_items(_algox_multi_outer(node_mins, node_maxes, normalized_subsets, subset_names), max_solutions)
 
-def multi_cover(subsets, node_mins, node_maxes):
-	solutions = multi_covers(subsets, node_mins, node_maxes, max_solutions = 1)
+def multi_cover(subsets, node_mins = None, node_maxes = None, node_ranges = None):
+	solutions = multi_covers(subsets, node_mins, node_maxes, node_ranges, max_solutions = 1)
 	return solutions[0] if solutions else None
 
-def can_multi_cover(subsets, node_mins, node_maxes):
-	return bool(multi_covers(subsets, node_mins, node_maxes, max_solutions = 1))
+def can_multi_cover(subsets, node_mins = None, node_maxes = None, node_ranges = None):
+	return bool(multi_covers(subsets, node_mins, node_maxes, node_ranges, max_solutions = 1))
 
-def unique_multi_cover(subsets, node_mins, node_maxes):
-	return len(multi_covers(subsets, node_mins, node_maxes, max_solutions = 2)) == 1
+def unique_multi_cover(subsets, node_mins = None, node_maxes = None, node_ranges = None):
+	return len(multi_covers(subsets, node_mins, node_maxes, node_ranges, max_solutions = 2)) == 1
 
-def can_unique_multi_cover(subsets, node_mins, node_maxes):
-	solutions = multi_covers(subsets, node_mins, node_maxes, max_solutions = 2)
+def can_unique_multi_cover(subsets, node_mins = None, node_maxes = None, node_ranges = None):
+	solutions = multi_covers(subsets, node_mins, node_maxes, node_ranges, max_solutions = 2)
 	return (solutions[0] if solutions else None), len(solutions) == 1
 
 

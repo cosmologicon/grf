@@ -137,25 +137,6 @@ IIGGGGGGJG
 """.lower().strip().splitlines()]
 N, S = 10, 2
 
-grid = [list(line.strip()) for line in """
-AAAAABBBBBCCCCC
-ADDDDBBBBBEEECC
-ADDDDDDBEEEEEEC
-ADDDFDDBEEGEEEC
-ADDFFFHHHGGGEEC
-AAAFFFHHHGGGCCC
-AAHHFHHIHHGHCCC
-AAAHHHIIIHHHJJJ
-AAAKKKIIIKKKKLJ
-AAAMKKKIKKKMLLJ
-NNNMMKKKKKMMLLJ
-NNNOMMMMMMMLLLJ
-NOOOOMMMMMOOLLL
-NOOOOOMMMOOOLLL
-NNOOOOOOOOOOLLL
-""".lower().strip().splitlines()]
-N, S = 15, 3
-
 subsets = {}
 for y in range(N):
 	for x in range(N):
@@ -181,4 +162,69 @@ for x, y in solution:
 for line in grid:
 	print(*line)
 print()
+
+
+# Battleship
+# https://krazydad.com/battleships/sfiles/BSHIPS_12x12_v1_2pp_b1.pdf #1
+
+N = 12
+shipcounts = (5, 1), (4, 1), (3, 2), (2, 3), (1, 4)
+columncounts = 3, 0, 1, 4, 0, 1, 2, 3, 4, 3, 4, 0
+rowcounts = 0, 5, 0, 0, 2, 6, 3, 0, 3, 1, 3, 2
+ranges = {}
+for ship_size, count in shipcounts:
+	ranges[("s", ship_size)] = count
+for jcolumn, count in enumerate(columncounts):
+	ranges[("c", jcolumn)] = count
+for jrow, count in enumerate(rowcounts):
+	ranges[("r", jrow)] = count
+for x in range(N):
+	for y in range(N):
+		ranges[("o", x, y)] = 0, 1
+
+pieces = {}
+def covers_of(cells):
+	covers = set((x + dx, y + dy) for x, y in cells for dx in (0, 1) for dy in (0, 1))
+	covers = [("o", x, y) for x, y in covers if x < N and y < N]
+	covers += [("s", len(cells))]
+	for x, y in cells:
+		covers += [("c", x), ("r", y)]
+	return covers
+for ship_size in (1, 2, 3, 4, 5):
+	for x in range(N):
+		for y in range(N+1 - ship_size):
+			cells = tuple((x, y + j) for j in range(ship_size))
+			pieces[cells] = covers_of(cells)
+			if ship_size > 1:
+				cells = tuple((y + j, x) for j in range(ship_size))
+				pieces[cells] = covers_of(cells)
+
+def adddiamond(p):
+	ranges[("d", p)] = 1
+	for piece, covers in pieces.items():
+		if p in piece:
+			covers.append(("d", p))
+def addcircle(p):
+	ranges[("c", p)] = 1
+	for piece, covers in pieces.items():
+		if p in piece and len(piece) == 1:
+			covers.append(("c", p))
+def addend(p, d):
+	(x, y), (dx, dy) = p, d
+	ranges[("e", p)] = 1
+	for piece, covers in pieces.items():
+		if p in piece and (x+dx, y+dy) in piece and (x-dx, y-dy) not in piece:
+			covers.append(("e", p))
+
+addcircle((3, 4))
+addend((0, 5), (0, -1))
+addend((9, 10), (-1, 0))
+
+solution = grf.multi_cover(pieces, node_ranges = ranges)
+grid = { (x, y): "." for x in range(N) for y in range(N) }
+for piece in solution:
+	for x, y in piece:
+		grid[(x, y)] = "#"
+for y in range(N):
+	print(*(grid[(x, y)] for x in range(N)))
 
