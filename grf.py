@@ -24,6 +24,17 @@ def graph_to_adjacency(graph):
 		adjacency[node1].add(node0)
 	return dict((node, sorted(anodes)) for node, anodes in adjacency.items())
 
+def fconnect_to_graph(nodes, fconnect, to_self=False, directed=False):
+	graph = []
+	nodes = list(nodes)
+	for i in range(len(nodes)):
+		js = list(range(i)) if directed else []
+		js += list(range(i if to_self else i + 1, len(nodes)))
+		for j in js:
+			if fconnect(nodes[i], nodes[j]):
+				graph.append((nodes[i], nodes[j]))
+	return graph
+
 # http://www.cs.berkeley.edu/~sinclair/cs271/n14.pdf
 def hamiltonian_path(graph, require_cycle=False):
 	if not is_connected(graph):

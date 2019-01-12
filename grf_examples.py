@@ -123,17 +123,18 @@ print()
 
 # Star Battle
 
+# Example from 2017 MIT Mystery Hunt
 grid = [list(line.strip()) for line in """
-AAAABBCCCC
-ADAABBBCBB
-ADDBBBBBBB
-DDDDBEEEEB
-DDBBBBBBEB
-FFFFGGHHHH
-FIFFGGGHGG
-FIIGGGGGGG
-IIIIGJJJJG
-IIGGGGGGJG
+AABBBBBBCC
+ABBADDDDDC
+AAAADECCCC
+DDDDDEEFFF
+DGGGGGEHHF
+GGIIIIEHFF
+GIIJJIEHHH
+GIGGJIEEJH
+GIIGJIJJJH
+GGGGJJJHHH
 """.lower().strip().splitlines()]
 N, S = 10, 2
 
@@ -147,16 +148,13 @@ for y in range(N):
 			("x", x),
 			("y", y),
 		] + [("s", a, b) for a in xs for b in ys]
-node_mins = {}
-node_maxes = {}
+node_ranges = {}
 regions = list(set(letter for line in grid for letter in line)) + [(p, n) for p in "xy" for n in range(N)]
-for region in regions:
-	node_mins[region] = node_maxes[region] = S
+node_ranges = { region: S for region in regions }
 for x in range(N-1):
 	for y in range(N-1):
-		node_mins[("s", x, y)] = 0
-		node_maxes[("s", x, y)] = 1
-solution = grf.multi_cover(subsets, node_mins, node_maxes)
+		node_ranges[("s", x, y)] = 0, 1
+solution = grf.multi_cover(subsets, node_ranges = node_ranges)
 for x, y in solution:
 	grid[y][x] = grid[y][x].upper()
 for line in grid:

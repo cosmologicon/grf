@@ -24,7 +24,7 @@
 from __future__ import division
 import time, random, math
 from collections import Counter, defaultdict
-from DancingLinksX import dlmatrix, alg_x
+#from DancingLinksX import dlmatrix, alg_x
 
 Ttest = 1
 
@@ -607,12 +607,34 @@ def algoxZs(jnodes, jsubsets, subsets, containers, overlappers, node_counts, sub
 				yield subcover + [selected_jsubset]
 	yield from _algo(jnodes, jsubsets, node_counts)
 
-def algoxZv(jnodes, jsubsets, subsets, containers, overlappers, node_counts, dead_input):
+def algoxZv(jnodes, jsubsets, subsets, containers, overlappers, node_counts, dead_input, check_bad=True):
 	if not jnodes:
 		yield []
 		return
-	if jnodes in dead_input:
+	if jsubsets in dead_input:
 		return
+	if check_bad:
+		removed_subsets = set()
+		for jsubset in jsubsets:
+			new_jnodes = jnodes - subsets[jsubset]
+			new_node_counts = list(node_counts)
+			for ksubset in jsubsets & overlappers[jsubset]:
+				for node in subsets[ksubset]:
+					new_node_counts[node] -= 1
+					if node in new_jnodes:
+						if new_node_counts[node] < 1:
+							removed_subsets.add(jsubset)
+	#	print(len(jsubsets), len(bad_jsubsets))
+		if removed_subsets:
+			new_jsubsets = jsubsets - removed_subsets
+			new_node_counts = list(node_counts)
+			for jsubset in removed_subsets:
+				for node in subsets[jsubset]:
+					new_node_counts[node] -= 1
+			for cover in algoxZv(jnodes, new_jsubsets, subsets, containers, overlappers, new_node_counts, dead_input, False):
+				yield cover
+			return
+
 	dead = True
 	min_jnode = min(jnodes, key = node_counts.__getitem__)
 	if node_counts[min_jnode] == 0:
@@ -626,11 +648,11 @@ def algoxZv(jnodes, jsubsets, subsets, containers, overlappers, node_counts, dea
 		for jsubset in removed_subsets:
 			for node in subsets[jsubset]:
 				new_node_counts[node] -= 1
-		for subcover in algoxZv(new_jnodes, new_jsubsets, subsets, containers, overlappers, new_node_counts, dead_input):
+		for subcover in algoxZv(new_jnodes, new_jsubsets, subsets, containers, overlappers, new_node_counts, dead_input, False):
 			yield subcover + [selected_jsubset]
 			dead = False
 	if dead:
-		dead_input.add(jnodes)
+		dead_input.add(jsubsets)
 
 
 if False:
@@ -669,7 +691,7 @@ if False:
 	print(4, *profile(algox4, algox4_args))
 	print(5, *profile(algox5, algox5_args))
 	print(6, *profile(algox6, algox6_args))
-print(7, *profile(algox7, algox7_args))
+#print(7, *profile(algox7, algox7_args))
 
 
 
