@@ -1,6 +1,12 @@
 # Generate an exact cover problem. Each output line is a set of numbers 1-N.
 # There is at least one combination of lines such that each number 1-N appears in exactly one line.
 
+# sudo apt install ghc
+# https://hackage.haskell.org/package/exact-cover
+
+
+
+
 from __future__ import division, print_function
 import random
 

@@ -120,6 +120,16 @@ for y in range(N):
 	print(*["Q" if (x, y) in solution else "." for x in range(N)])
 print()
 
+# N queens full solution
+for N in range(4, 13):
+	subsets = {}
+	for x in range(N):
+		for y in range(N):
+			subsets[(x, y)] = [("x", x), ("y", y), ("d", x+y), ("b", x-y)]
+	nodes = [(p, k) for p in "xy" for k in range(N)]
+	nsolution = len(grf.partial_covers(subsets, nodes))
+	print("{} queens: {} solutions".format(N, nsolution))
+print()
 
 # Star Battle
 

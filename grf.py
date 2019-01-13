@@ -1,6 +1,8 @@
 import math, random, string
 from collections import defaultdict, Counter
 
+DEBUG = False
+
 def nodes(graph):
 	return sorted(set.union(*map(set, graph))) if graph else []
 
@@ -86,15 +88,14 @@ def hamiltonian_cycle(graph):
 #   rows in the jnode'th column.
 # overlaps: list mapping jsubset to the set of jsubsets whose subsets intersect this one, i.e. the
 #   set of rows that share at least one column with the jsubset'th row.
-# dead_cache: set containing inputs (jsubsets) known to produce no output.
-def _algox_inner(jnodes, jsubsets, node_counts, subsets, containers, overlaps, dead_cache):
+# dead_cache: set containing partial solutions known to produce no output.
+def _algox_inner(jnodes, jsubsets, node_counts, partial_solution, subsets, containers, overlaps, dead_cache):
 	# Base case: no nodes left to be covered - solution found. We make the assumption that there are
 	# no empty subsets here - these are expected to be handled specially by the outer function.
 	if not jnodes:
-		yield []
+		yield list(partial_solution)
 		return
-	# jsubsets is a sufficient cache key - node_counts and jnodes are redundant within a given problem.
-	if dead_cache is not None and jsubsets in dead_cache:
+	if dead_cache is not None and partial_solution in dead_cache:
 		return
 	dead = True  # If still true at the end, this input produces no outputs.
 	# Select the node that appears in the fewest subsets, i.e. the column with the fewest 1's.
@@ -115,12 +116,12 @@ def _algox_inner(jnodes, jsubsets, node_counts, subsets, containers, overlaps, d
 		for removed_jsubset in removed_jsubsets:
 			for jnode in subsets[removed_jsubset]:
 				sub_node_counts[jnode] -= 1
-		for solution in _algox_inner(sub_jnodes, sub_jsubsets, sub_node_counts, subsets, containers, overlaps, dead_cache):
-			solution.append(selected_jsubset)
+		sub_partial_solution = partial_solution + (selected_jsubset,)
+		for solution in _algox_inner(sub_jnodes, sub_jsubsets, sub_node_counts, sub_partial_solution, subsets, containers, overlaps, dead_cache):
 			yield solution
 			dead = False
 	if dead_cache is not None and dead:
-		dead_cache.add(jsubsets)
+		dead_cache.add(partial_solution)
 
 # Exact cover Algorithm X outer function.
 # Most of the essential logic is handled by _algox_inner. The main purpose of _algox_outer is to
@@ -174,7 +175,7 @@ def _algox_outer(nodes, subsets, subset_names):
 	for empty_jsubset in empty_jsubsets:
 		empty_jsubset_sets += [jsubset_set + [empty_jsubset] for jsubset_set in empty_jsubset_sets]
 
-	for solution in _algox_inner(jnodes, frozenset(jsubsets), node_counts, subsetjs, containers, overlaps, set()):
+	for solution in _algox_inner(jnodes, jsubsets, node_counts, (), subsetjs, containers, overlaps, set()):
 		# Empty subsets are not handled by the inner function (because the algorithm would never
 		# select them). But the presence or absence of an empty subset does not affect the
 		# validity of a solution. So for every solution, we add every possible set of empty subsets
@@ -279,7 +280,7 @@ def _algox_partial_outer(nodes, required_nodes, subsets, subset_names):
 	for jnode, container in enumerate(containers):
 		for jsubset in container:
 			overlaps[jsubset] |= container
-	for solution in _algox_inner(required_jnodes, frozenset(jsubsets), node_counts, required_subsetjs, containers, overlaps, set()):
+	for solution in _algox_inner(required_jnodes, jsubsets, node_counts, (), required_subsetjs, containers, overlaps, set()):
 		available = set(optional_jsubsets)
 		for jsubset in solution:
 			available -= overlaps[jsubset]
@@ -374,9 +375,9 @@ def _algox_multi_inner(jnodes, jnode_mins, jnode_maxes, jsubsets, node_totals, p
 			dead = False
 	if dead_cache is not None and dead:
 		dead_cache.add(dead_key)
-#		if len(dead_cache) % 1000 == 0:
-#			sizes = Counter(map(len, dead_cache))
-#			print(len(dead_cache), *[sizes[s] for s in range(max(sizes) + 1)])
+		if DEBUG and len(dead_cache) % 1000 == 0:
+			sizes = Counter(map(len, dead_cache))
+			print(len(dead_cache), *[sizes[s] for s in range(max(sizes) + 1)])
 def _algox_multi_node_coverings(selected_jnode, available, available_total, jnodes, jnode_mins, jnode_maxes, jsubsets, node_totals, partial_solution, subsets, containers):
 	if selected_jnode not in jnodes:
 		yield jnodes, jnode_mins, jnode_maxes, jsubsets, node_totals, partial_solution
