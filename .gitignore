@@ -4,6 +4,10 @@
 # DancingLinksX repository
 DancingLinksX
 
+# algox_profile repositories
+algox_profile/grf.py
+algox_profile/dlx
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
