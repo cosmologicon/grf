@@ -3,11 +3,14 @@
 
 
 from __future__ import division, print_function
-import random
+import random, sys
 
-N = 3000
-s = 30   # approximate size of sets
-m = 3000  # number of sets
+N = 40000
+s = 200   # approximate size of sets
+m = 4000  # number of sets
+
+if True:
+	N, s, m = [int(arg) for arg in sys.argv[1:]]
 
 nodes = list(range(N))
 
@@ -20,7 +23,7 @@ for n in nodes:
 while len(subsets) < m:
 	subsets.append([n for n in nodes if random.random() * N < s])
 
-subsets = [tuple(sorted(subset)) for subset in subsets]
+subsets = [tuple(sorted(subset)) for subset in subsets if subset]
 for subset in sorted(subsets):
 	print(*subset)
 
