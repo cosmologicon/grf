@@ -8,6 +8,8 @@ DancingLinksX
 algox_profile/grf.py
 algox_profile/dlx
 algox_profile/dlx-cpp
+algox_profile/exact-cover
+algox_profile/exact-cover-*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

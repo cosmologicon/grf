@@ -560,6 +560,7 @@ def algoxZ(jnodes, jsubsets, subsets, containers, overlappers, node_counts, dead
 		yield []
 		return
 	if jsubsets in dead_input:
+#		print(*jsubsets)
 		return
 	dead = True
 	min_jnode = min(jnodes, key = node_counts.__getitem__)
@@ -607,35 +608,10 @@ def algoxZs(jnodes, jsubsets, subsets, containers, overlappers, node_counts, sub
 				yield subcover + [selected_jsubset]
 	yield from _algo(jnodes, jsubsets, node_counts)
 
-def algoxZv(jnodes, jsubsets, subsets, containers, overlappers, node_counts, dead_input, check_bad=True):
+def algoxZv(jnodes, jsubsets, subsets, containers, overlappers, node_counts, dead_input):
 	if not jnodes:
 		yield []
 		return
-	if jsubsets in dead_input:
-		return
-	if check_bad:
-		removed_subsets = set()
-		for jsubset in jsubsets:
-			new_jnodes = jnodes - subsets[jsubset]
-			new_node_counts = list(node_counts)
-			for ksubset in jsubsets & overlappers[jsubset]:
-				for node in subsets[ksubset]:
-					new_node_counts[node] -= 1
-					if node in new_jnodes:
-						if new_node_counts[node] < 1:
-							removed_subsets.add(jsubset)
-	#	print(len(jsubsets), len(bad_jsubsets))
-		if removed_subsets:
-			new_jsubsets = jsubsets - removed_subsets
-			new_node_counts = list(node_counts)
-			for jsubset in removed_subsets:
-				for node in subsets[jsubset]:
-					new_node_counts[node] -= 1
-			for cover in algoxZv(jnodes, new_jsubsets, subsets, containers, overlappers, new_node_counts, dead_input, False):
-				yield cover
-			return
-
-	dead = True
 	min_jnode = min(jnodes, key = node_counts.__getitem__)
 	if node_counts[min_jnode] == 0:
 		return
@@ -648,17 +624,15 @@ def algoxZv(jnodes, jsubsets, subsets, containers, overlappers, node_counts, dea
 		for jsubset in removed_subsets:
 			for node in subsets[jsubset]:
 				new_node_counts[node] -= 1
-		for subcover in algoxZv(new_jnodes, new_jsubsets, subsets, containers, overlappers, new_node_counts, dead_input, False):
+		for subcover in algoxZ(new_jnodes, new_jsubsets, subsets, containers, overlappers, new_node_counts, dead_input):
 			yield subcover + [selected_jsubset]
-			dead = False
-	if dead:
-		dead_input.add(jsubsets)
 
 
-if False:
+if True:
 #	profilecompare((algoxZ, algoxZ_args), (algoxZs, algoxZ_args))
 #	profilecompare((algoxZ, algoxZ_args), (algox7, algox7_args))
 	profilecompare((algoxZ, algoxZ_args), (algoxZv, algoxZ_args))
+#	profilecompare((algox2l, algox2l_args), (algox2c, algox2c_args))
 #	profilecompare((algoxZv, algoxZv2_args), (algoxZv, algoxZv_args))
 	exit()
 
