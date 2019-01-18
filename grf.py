@@ -5,6 +5,7 @@ DEBUG = False
 
 def nodes(graph):
 	return sorted(set.union(*map(set, graph))) if graph else []
+nodes_of_graph = nodes
 
 def is_connected(graph):
 	if not graph:
@@ -19,12 +20,51 @@ def is_connected(graph):
 		connected_nodes |= set.union(*connected_edges)
 	return True
 
+def connected_components(graph):
+	if not graph:
+		return []
+	edgesets = []
+	for edge in graph:
+		thisedges = [edge]
+		thisnodes = set(edge)
+		othersets = []
+		for edges, nodes in edgesets:
+			if thisnodes & nodes:
+				thisedges += edges
+				thisnodes |= nodes
+			else:
+				othersets.append((edges, nodes))
+		edgesets = othersets + [(thisedges, thisnodes)]
+	edges, nodes = zip(*edgesets)
+	return edges
+
 def graph_to_adjacency(graph):
 	adjacency = defaultdict(set)
 	for node0, node1 in graph:
 		adjacency[node0].add(node1)
 		adjacency[node1].add(node0)
 	return dict((node, sorted(anodes)) for node, anodes in adjacency.items())
+
+# Discards singleton nodes
+def adjacency_to_graph(nodes, adjacency, directional=False, to_self=False):
+	graph = []
+	nodes = list(nodes)
+	for i in range(len(nodes)):
+		js = list(range(i) if directional else []) + ([i] if to_self else []) + list(range(i + 1, len(nodes)))
+		for j in js:
+			if adjacency(nodes[i], nodes[j]):
+				graph.append((nodes[i], nodes[j]))
+	return graph
+
+# Also handles singleton nodes
+def adjacency_to_connected_node_sets(nodes, adjacency, directional=False, to_self=False):
+	graph = []
+	components = connected_components(adjacency_to_graph(nodes, adjacency, directional=directional, to_self=to_self))
+	node_sets = [nodes_of_graph(component) for component in components]
+	nodes = set(nodes)
+	for node_set in node_sets:
+		nodes -= set(node_set)
+	return node_sets + [[node] for node in nodes]
 
 def fconnect_to_graph(nodes, fconnect, to_self=False, directed=False):
 	graph = []
@@ -540,63 +580,58 @@ def can_unique_multi_cover(subsets, node_mins = None, node_maxes = None, node_ra
 
 # Polyominoes are sets of grid coordinates (which are ordered pairs of integers).
 #   Example: ((0, 0), (1, 0), (1, 1), (2, 1))
-# Polyominoes may optionally have an additional non-tuple element, which is the piece's name.
+# Polyominoes may optionally have an additional string element, which is the piece's name.
 #   Example: ("Z", (0, 0), (1, 0), (1, 1), (2, 1))
+# TODO: extend the definition to include labeled polyominoes
 def _split_poly(poly):
-	labels, cells = [], []
-	for x in poly:
-		if type(x) is tuple:
-			cells.append(x)
-		else:
-			labels.append(x)
-	if len(labels) > 1:
-		raise ValueError
-	if len(labels) == 1:
-		return labels[0], tuple(cells)
-	return None, tuple(cells)
-def _join_poly(label, cells):
-	return cells if label is None else (label,) + cells
-			
+	if poly and not isinstance(poly[0], tuple):
+		return poly[0], poly[1:]
+	return None, poly
+def _join_poly(name, poly):
+	return poly if name is None else (name,) + poly
+def _cells_of_grid(grid):
+	for y, line in enumerate(grid.splitlines()):
+		for x, char in enumerate(line):
+			yield (x, y), char
+def _shift_poly(poly, dx, dy):
+	name, poly = _split_poly(poly)
+	poly = tuple((x + dx, y + dy) for x, y in poly)
+	return _join_poly(name, poly)
+def _align_poly(poly):
+	name, poly = _split_poly(poly)
+	if poly:
+		xs, ys = zip(*poly)
+		poly = _shift_poly(poly, -min(xs), -min(ys))
+	return _join_poly(name, poly)
+
 # Parse polyominoes from a string
 # Polyominoes are defined with any non-whitespace character
-def parse_polyominoes(spec, annotate = False, align = True, allow_disconnected = False):
+def parse_polys(spec, annotate = False, align = True, allow_disconnected = False):
 	spots = defaultdict(list)
-	for y, line in enumerate(spec.splitlines()):
-		for x, char in enumerate(line):
-			if not char.strip():
-				continue
-			spots[char].append((x, y))
-	polys = []
+	for cell, char in _cells_of_grid(spec):
+		if not char.strip():
+			continue
+		spots[char].append(cell)
+	if not spots:
+		return []
 	def is_adjacent(node0, node1):
 		(x0, y0), (x1, y1) = node0, node1
 		return abs(x0 - x1) + abs(y0 - y1) == 1
-	def get_connected(nodes):
-		nodesets = []
-		for node in nodes:
-			thisset = set([node])
-			othersets = []
-			for nodeset in nodesets:
-				if any(is_adjacent(node, n) for n in nodeset):
-					thisset |= nodeset
-				else:
-					othersets.append(nodeset)
-			nodesets = othersets + [thisset]
-		return nodesets
-	for char, nodes in spots.items():
-		if allow_disconnected:
-			polys.append((char, nodes))
-		else:
-			for nodeset in get_connected(nodes):
-				polys.append((char, nodeset))
-	polys = [(char, tuple(sorted(poly))) for char, poly in polys]
-	polys.sort(key = lambda cpoly: cpoly[1])
+	if allow_disconnected:
+		polys = [(char,) + tuple(sorted(cells)) for char, cells in spots.items()]
+	else:
+		polys = []
+		for char, cells in spots.items():
+			node_sets = adjacency_to_connected_node_sets(cells, is_adjacent)
+			polys += [(char,) + tuple(sorted(node_set)) for node_set in node_sets]
 	if align:
-		polys = [(char, align_polyomino(poly)) for char, poly in polys]
+		polys = [_align_poly(poly) for poly in polys]
 	if annotate:
-		ks, vs = zip(*polys)
-		if len(set(ks)) == 1 and ks[0] in ".*#":
-			polys = list(zip(_generic_labels(), vs))
-	return [(_join_poly(char, poly) if annotate else poly) for char, poly in polys]
+		if len(spots) == 1:
+			polys = [(label,) + _split_poly(poly)[1] for poly, label in zip(polys, _generic_labels())]
+	else:
+		polys = [_split_poly(poly)[1] for poly in polys]
+	return polys
 		
 # A B C ... Z AA AB AC ... AZ BA BB BC ...
 def _generic_labels():

@@ -15,6 +15,7 @@ class GrfTest(unittest.TestCase):
 		self.assertFalse(grf.is_connected(["AB", "CD", "DF"]))
 		self.assertTrue(grf.is_connected(["AB", "CD", "DB"]))
 
+	# TODO: deterministic test
 	def testHamiltonianPath(self):
 		def checkHamiltonian(graph):
 			path = grf.hamiltonian_path(graph)
@@ -163,6 +164,28 @@ class GrfTest(unittest.TestCase):
 		solution, solution_is_unique = grf.can_unique_exact_cover("AB BC".split())
 		self.assertIsNone(solution)
 		self.assertFalse(solution_is_unique)
+
+#def parse_polys(spec, annotate = False, align = True, allow_disconnected = False):
+
+
+	def testParsePolys(self):
+		self.assertEqual([((0, 0),)], grf.parse_polys("#"))
+		self.assertEqual([((0, 0),)], grf.parse_polys(" #"))
+		self.assertEqual([((1, 0),)], grf.parse_polys(" #", align=False))
+		self.assertEqual([((0, 0),), ((0, 0),)], grf.parse_polys("# #"))
+		self.assertEqual([((0, 0), (2, 0),)], grf.parse_polys("# #", allow_disconnected=True))
+		self.assertEqual([((0, 0), (0, 1), (1, 1), (2, 0), (2, 1))], grf.parse_polys("# #\n###"))
+		self.assertEqual([((0, 0), (1, 0))], grf.parse_polys("AA"))
+		self.assertEqual([((0, 0),), ((0, 0),)], grf.parse_polys("AB"))
+		self.assertEqual([((0, 0),), ((0, 0),), ((0, 0),)], grf.parse_polys("ABA"))
+		self.assertEqual([((0, 0), (2, 0)), ((0, 0),)], grf.parse_polys("ABA", allow_disconnected=True))
+		self.assertEqual([("A", (0, 0))], grf.parse_polys("#", annotate=True))
+		self.assertEqual([("A", (0, 0), (1, 0))], grf.parse_polys("##", annotate=True))
+		self.assertEqual([("A", (0, 0)), ("B", (0, 0))], grf.parse_polys("# #", annotate=True))
+		self.assertEqual([("X", (0, 0)), ("Y", (0, 0))], grf.parse_polys("X Y", annotate=True))
+		self.assertEqual([("X", (0, 0)), ("Y", (0, 0))], grf.parse_polys("XY", annotate=True))
+		self.assertEqual([("X", (0, 0)), ("X", (0, 0)), ("Y", (0, 0))], grf.parse_polys("XYX", annotate=True))
+		self.assertEqual([("X", (0, 0), (2, 0)), ("Y", (0, 0))], grf.parse_polys("XYX", annotate=True, allow_disconnected=True))
 
 	def testAstarUniform(self):
 		neighbors = dict(zip("ABCDEFG", "BC ACF ABDF CFE DG BCD E".split())).get
