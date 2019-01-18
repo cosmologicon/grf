@@ -592,7 +592,8 @@ def _join_poly(name, poly):
 def _cells_of_grid(grid):
 	for y, line in enumerate(grid.splitlines()):
 		for x, char in enumerate(line):
-			yield (x, y), char
+			if char.strip():
+				yield (x, y), char
 def _shift_poly(poly, dx, dy):
 	name, poly = _split_poly(poly)
 	poly = tuple((x + dx, y + dy) for x, y in poly)
@@ -609,8 +610,6 @@ def _align_poly(poly):
 def parse_polys(spec, annotate = False, align = True, allow_disconnected = False):
 	spots = defaultdict(list)
 	for cell, char in _cells_of_grid(spec):
-		if not char.strip():
-			continue
 		spots[char].append(cell)
 	if not spots:
 		return []
@@ -646,12 +645,6 @@ def _generic_labels():
 		for label in powerset([string.ascii_uppercase] * n):
 			yield label
 
-def align_polyomino(poly):
-	label, poly = _split_poly(poly)
-	xs, ys = zip(*poly)
-	x0, y0 = min(xs), min(ys)
-	poly = [(x - x0, y - y0) for x, y in sorted(poly)]
-	return _join_poly(label, poly)
 
 def polyomino_rotations(poly, flip = False):
 	label, poly = _split_poly(poly)
@@ -666,6 +659,15 @@ def polyomino_rotations(poly, flip = False):
 			rotations.add(align_polyomino(flipped(poly)))
 		poly = rotated(poly)
 	return [(_join_poly(label, poly) for poly in sorted(rotations))]
+
+def parse_grid(spec, align=True):
+	cells = list(_cells_of_grid(spec))
+	if not cells:
+		return {}
+	cells, labels = zip(*cells)
+	if align:
+		cells = _align_poly(cells)
+	return dict(zip(cells, labels))
 
 
 # https://en.wikipedia.org/wiki/A*_search_algorithm

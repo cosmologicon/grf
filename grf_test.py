@@ -187,6 +187,12 @@ class GrfTest(unittest.TestCase):
 		self.assertEqual([("X", (0, 0)), ("X", (0, 0)), ("Y", (0, 0))], grf.parse_polys("XYX", annotate=True))
 		self.assertEqual([("X", (0, 0), (2, 0)), ("Y", (0, 0))], grf.parse_polys("XYX", annotate=True, allow_disconnected=True))
 
+	def testParseGrid(self):
+		self.assertEqual({}, grf.parse_grid(""))
+		self.assertEqual({(0, 0): "A"}, grf.parse_grid("A"))
+		self.assertEqual({(0, 0): "A", (1, 0): "B"}, grf.parse_grid("AB"))
+		self.assertEqual({(0, 0): "A", (1, 1): "A"}, grf.parse_grid("A\n A"))
+
 	def testAstarUniform(self):
 		neighbors = dict(zip("ABCDEFG", "BC ACF ABDF CFE DG BCD E".split())).get
 		h = dict(zip("ABCDEFG", (2,2,2,1,0,1,0))).get
