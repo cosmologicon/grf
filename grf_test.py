@@ -193,6 +193,14 @@ class GrfTest(unittest.TestCase):
 		self.assertEqual({(0, 0): "A", (1, 0): "B"}, grf.parse_grid("AB"))
 		self.assertEqual({(0, 0): "A", (1, 1): "A"}, grf.parse_grid("A\n A"))
 
+	def testPolyWithinGrid(self):
+		self.assertEqual(0, len(grf.poly_within_grid(((0, 0),), {})))
+		self.assertEqual(1, len(grf.poly_within_grid(((0, 0),), grf.rect_grid(1, 1))))
+		self.assertEqual(0, len(grf.poly_within_grid(((0, 0), (1, 0)), grf.rect_grid(1, 1))))
+		self.assertEqual(2, len(grf.poly_within_grid(((0, 0), (1, 0)), grf.rect_grid(3, 1))))
+		self.assertEqual(7, len(grf.poly_within_grid(((0, 0), (1, 0)), grf.rect_grid(3, 2))))
+		self.assertEqual(4, len(grf.poly_within_grid(((0, 0), (1, 0)), grf.rect_grid(3, 2), rotate=False)))
+
 	def testAstarUniform(self):
 		neighbors = dict(zip("ABCDEFG", "BC ACF ABDF CFE DG BCD E".split())).get
 		h = dict(zip("ABCDEFG", (2,2,2,1,0,1,0))).get

@@ -669,6 +669,27 @@ def parse_grid(spec, align=True):
 		cells = _align_poly(cells)
 	return dict(zip(cells, labels))
 
+def rect_grid(w, h):
+	return {(x, y): "." for x in range(w) for y in range(h)}
+
+def poly_within_grid(poly, grid, rotate=True, flip=False):
+	label, poly = _split_poly(poly)
+	orientations = [poly]
+	if flip:
+		orientations += [tuple((-x, y) for x, y in poly)]
+	if rotate:
+		orientations += [tuple((-x, -y) for x, y in p) for p in orientations]
+		orientations += [tuple((y, -x) for x, y in p) for p in orientations]
+	orientations = sorted(set(_align_poly(p) for p in orientations))
+	polys = set()
+	grid = set(grid)
+	for p0 in orientations:
+		x0, y0 = p0[0]
+		for x, y in grid:
+			p = _shift_poly(p0, x - x0, y - y0)
+			if set(p) <= grid:
+				polys.add(p)
+	return [_join_poly(label, p) for p in sorted(polys)]
 
 # https://en.wikipedia.org/wiki/A*_search_algorithm
 # A* search where every edge has uniform weight.

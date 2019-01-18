@@ -121,7 +121,7 @@ for y in range(N):
 print()
 
 # N queens full solution
-for N in range(4, 13):
+for N in range(4, 11):
 	subsets = {}
 	for x in range(N):
 		for y in range(N):
@@ -235,4 +235,23 @@ for piece in solution:
 		grid[(x, y)] = "#"
 for y in range(N):
 	print(*(grid[(x, y)] for x in range(N)))
+
+# Pentominoes
+
+print()
+polys = grf.parse_polys("""
+## ## ##   ##
+#  #   ## ##
+""", annotate=True)
+grid = grf.rect_grid(8, 2)
+labels = [poly[0] for poly in polys]
+covers = [cover for poly in polys for cover in grf.poly_within_grid(poly, grid, flip=True)]
+
+solution = grf.partial_cover(covers, labels)
+for cover in solution:
+	label = cover[0]
+	for cell in cover[1:]:
+		grid[cell] = label
+for y in range(10):
+	print(*[grid.get((x, y), " ") for x in range(10)])
 
